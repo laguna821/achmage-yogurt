@@ -11,7 +11,7 @@ const SYSTEM = 'You are the text-only meeting assistant inside Yogurt. Follow th
 /** Official clients own credentials. Never copy OAuth tokens or fall back to API billing. */
 export function subscriptionEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env }
-  for (const k of Object.keys(env)) if (/^(ANTHROPIC_|OPENAI_API_|CLAUDE_CODE_USE_|ELECTRON_|APPIMAGE|APPDIR$|LD_LIBRARY_PATH$|CLAUDECODE$)/.test(k)) delete env[k]
+  for (const k of Object.keys(env)) if (/^(ANTHROPIC_|OPENAI_|CODEX_API_KEY$|CLAUDE_CODE_USE_|ELECTRON_|APPIMAGE|APPDIR$|LD_LIBRARY_PATH$|CLAUDECODE$)/.test(k)) delete env[k]
   env.PATH = [join(os.homedir(), '.local/bin'), join(os.homedir(), '.config/orca/codex-connection/bin'), env.PATH ?? '', '/usr/bin', '/bin'].join(':')
   return env
 }

@@ -35,9 +35,11 @@ describe('official subscription client bridge', () => {
     expect(subscriptionArgs('claude-sonnet-5-5')).toContain('--safe-mode')
     expect(subscriptionArgs('gpt-6.2-sol')).toContain('gpt-6.2-sol')
     expect(subscriptionArgs('gpt-6.2-sol')).toContain('features.shell_tool=false')
-    process.env.ANTHROPIC_API_KEY = 'test-only'; process.env.OPENAI_API_KEY = 'test-only'
+    const previous = { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, OPENAI_API_KEY: process.env.OPENAI_API_KEY, OPENAI_BASE_URL: process.env.OPENAI_BASE_URL }
+    process.env.ANTHROPIC_API_KEY = 'test-only'; process.env.OPENAI_API_KEY = 'test-only'; process.env.OPENAI_BASE_URL = 'https://example.invalid'
     const env = subscriptionEnv()
-    delete process.env.ANTHROPIC_API_KEY; delete process.env.OPENAI_API_KEY
+    for (const [k, v] of Object.entries(previous)) { if (v === undefined) delete process.env[k]; else process.env[k] = v }
     expect(env.ANTHROPIC_API_KEY).toBeUndefined(); expect(env.OPENAI_API_KEY).toBeUndefined()
+    expect(env.OPENAI_BASE_URL).toBeUndefined()
   })
 })
