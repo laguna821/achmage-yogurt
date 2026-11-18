@@ -51,6 +51,16 @@ const turboUrl = catalog.asr[0].url
 const smallUrl = catalog.asr[1].url
 
 describe('SetupController', () => {
+  it('subscription mode downloads only the selected speech model and never probes or fetches local AI', async () => {
+    const hardware = vi.fn(async () => { throw new Error('local GPU probing must not run') })
+    const { c, rec } = setup({ subscription: true, getHardware: hardware })
+    await c.start(); await c.idle()
+    expect(c.state.phase).toBe('ready')
+    expect(c.notesPath()).toBe('subscription')
+    expect(c.installed()?.embed).toBeUndefined()
+    expect(hardware).not.toHaveBeenCalled()
+    expect(rec.asked).toEqual([turboUrl])
+  })
   it('goes checking, downloading, ready; the fraction only goes up and ends at 1', async () => {
     const { c, states } = setup()
     expect(c.state.phase).toBe('checking')

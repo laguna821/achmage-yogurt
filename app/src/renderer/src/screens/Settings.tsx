@@ -15,6 +15,7 @@ import { appShortcuts } from '../components/Shortcuts'
 import { CalendarSettings } from '../components/CalendarSettings'
 import { supportedKinds } from '../../../shared/platform'
 import { Swap, SwapText } from '../components/Swap'
+import { SubscriptionSettings } from '../components/SubscriptionSettings'
 
 const THEMES = () => [['system', osWords({ mac: t('Match my Mac'), windows: t('Match Windows'), linux: t('Match my system') })], ['light', t('Light')], ['dark', t('Dark')]] as const
 // each computer's own words for starting at login and its icon's place: the menu bar, the notification area, the tray
@@ -73,6 +74,7 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
       <div className="settings-scroll" ref={scroll}>
         <div className="settings-content">
           <h1 data-testid="settings-heading" className="settings-heading">{t('Settings')}</h1>
+          {!window.yogurt.fake && <SubscriptionSettings />}
 
           <h2 className="settings-section-heading">{t('General')}</h2>
           <div className="settings-group"><LoadingContent pending={!prefs} testId="settings-loading" onReady={() => setGeneralReady(true)}>
@@ -144,7 +146,7 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
               await window.yogurt.settings.setKeepRecordings(on)
               setPrefs(p => p && { ...p, keepRecordings: on })
             }} />
-            <NotesModel reveal={focus === 'notes-model'} />
+            {window.yogurt.fake && <NotesModel reveal={focus === 'notes-model'} />}
           </LoadingContent></div>
 
           <h2 className="settings-section-heading">{t('What Yogurt can use')}</h2>

@@ -22,6 +22,8 @@ app/resources/dict/
 app/native/.whisper-build/
 
 # local builds and profiles
+/appdir/
+/packaged/
 app/out-*/
 app/test-results-*/
 output/

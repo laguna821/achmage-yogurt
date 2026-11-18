@@ -4,6 +4,11 @@ import { capabilities, platformOf } from '../shared/platform'
 import type { ChatView, ConversationSummary, ConversationView, NoteView, PromptAction, SetupState, UpdateStatus, WidgetView, YogurtApi } from '../shared/types'
 
 const api: YogurtApi = {
+  subscription: {
+    status: () => ipcRenderer.invoke('subscription:status'),
+    apply: (model) => ipcRenderer.invoke('subscription:apply', model),
+    removeLocal: () => ipcRenderer.invoke('subscription:remove-local'),
+  },
   platform: process.platform,
   os: platformOf(process.platform, process.env),
   capabilities: capabilities(platformOf(process.platform, process.env)),

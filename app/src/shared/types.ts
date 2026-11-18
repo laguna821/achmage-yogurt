@@ -23,6 +23,11 @@ export type MeetingCard = StoredMeetingCard & { paused?: true }
 
 /** What the window sees of the app: window.yogurt (the preload bridge, contextIsolation on) */
 export type YogurtApi = {
+  subscription: {
+    status(): Promise<import('./subscription').SubscriptionStatus>
+    apply(model: import('./subscription').SubscriptionModel): Promise<import('./subscription').SubscriptionCheck>
+    removeLocal(): Promise<number>
+  }
   platform: NodeJS.Platform
   /** the computer the screens are for: the real one, or in fake mode the one YOGURT_FAKE_PLATFORM pretends to be (shortcut keys follow it) */
   os: string

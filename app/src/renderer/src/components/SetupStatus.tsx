@@ -15,7 +15,7 @@ export function setupItems(state: SetupState): StatusItem[] {
     id: 'transcription', done: state.phase === 'ready',
     text: state.phase === 'ready' ? t('Transcription ready')
       : state.phase === 'downloading' ? `${transcriptionPhase(state)} · ${transcriptionPercent(state)}`
-        : osWords({ mac: t('Everything stays on your Mac.'), other: t('Everything stays on your computer.') }),
+        : t('Preparing the transcription model'),
   }]
 }
 

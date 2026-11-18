@@ -58,7 +58,9 @@ import { setJargon, setOwnerName } from './vocab'
 import { cleanJargon } from '../shared/jargon'
 import { setGenericTitles } from './titles'
 import { installAppMenu } from './appMenu'
-import { UtilityEngine } from './engine'
+import { SubscriptionEngine } from './subscriptionEngine'
+import { hookSubscriptionSettings } from './subscriptionSettings'
+import { subscriptionModel } from '../shared/subscription'
 import { createNotesModel } from './notes/model'
 import { FakeEngine } from './notes/fake'
 import { hookNotes } from './notes'
@@ -163,6 +165,7 @@ let probeGpu: () => Promise<GpuProbe | null> = async () => null
 function createSetup(): SetupController {
   const modelsDir = join(userDataDir(), 'models')
   return new SetupController({
+    subscription: !isFake(),
     modelsDir,
     upgradePreference: {
       load: () => loadSettings(join(userDataDir(), 'settings.json')).notesUpgradeSkipped === true,
@@ -567,16 +570,14 @@ app.whenReady().then(() => {
     // recording that can't go on ends the meeting, with the notes kept
     stopMeeting: (id) => { stopMeeting(id) } })
   // 32 GB and up: the notes model reads each meeting in as it happens (notes/readAhead.ts)
-  const readsAhead = !isFake() && readAheadAllowed(os.totalmem())
+  // Subscription requests happen for an explicit summary/chat job, never for background read-ahead.
+  const readsAhead = false
   // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
-  const engine = isFake() ? new FakeEngine() : new UtilityEngine(join(__dirname, 'engine.js'), { gpuFallback: process.platform !== 'darwin', cpuCrashes: process.platform === 'linux' })
-  if (engine instanceof UtilityEngine) probeGpu = () => engine.probe().then((g) => {
-    console.info('NOTES', `graphics: ${g.gpuType || 'none'}${g.gpuNames.length ? ` (${g.gpuNames.join(', ')})` : ''}, ${g.vramTotalGB.toFixed(1)} GB`)
-    return g
-  }, (e) => { console.warn("couldn't check the graphics", e); return null })
+  const engine = isFake() ? new FakeEngine() : new SubscriptionEngine(() => subscriptionModel(loadSettings(settingsFile).aiModel), join(userDataDir(), 'subscription-runtime'))
+  if (!isFake()) hookSubscriptionSettings(userDataDir(), () => engine instanceof SubscriptionEngine && engine.busy)
   // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
   const smallMac = isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem())
-  const model = createNotesModel({ engine, modelPath: () => setup.notesPath(), onLoaded: path => setup.notesModelLoaded(path) })
+  const model = createNotesModel({ engine, modelPath: () => isFake() ? setup.notesPath() : setup.notesPath() ? `subscription:${subscriptionModel(loadSettings(settingsFile).aiModel)}` : undefined, onLoaded: path => setup.notesModelLoaded(path) })
   // first run: the notes model lands after recording already works; jobs wait in the queue for it
   // the embedding model (meaning search across meetings) runs in the same worker and is let go with the notes model
   const embedder = createEmbedder({ engine, modelPath: () => setup.installed()?.embed, id: bundledCatalog.embedding.id, dims: bundledCatalog.embedding.dims })
@@ -1022,7 +1023,8 @@ app.whenReady().then(() => {
   startDetection()
   void setup.start()
   // new versions from GitHub Releases, downloaded in the background and installed on quit
-  const updatesAvailable = updatesOn({ packaged: app.isPackaged, fake: isFake(), profile: !!process.env.YOGURT_USER_DATA, platform: process.platform, appImage: !!process.env.APPIMAGE,
+  // An upstream binary would remove subscription support. Keep the official updater in test mode only.
+  const updatesAvailable = isFake() && updatesOn({ packaged: app.isPackaged, fake: isFake(), profile: !!process.env.YOGURT_USER_DATA, platform: process.platform, appImage: !!process.env.APPIMAGE,
     feed: app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
     preview: app.isPackaged && isPreviewBuild((() => { try { return readFileSync(join(app.getAppPath(), 'package.json'), 'utf8') } catch { return '' } })()) })
   hookUpdates({ file: join(userDataDir(), 'settings.json'), available: updatesAvailable, recording: () => !!activeMeeting(), onCall: () => onCall(),

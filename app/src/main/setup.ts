@@ -17,6 +17,8 @@ export type SpeedDeps = {
 }
 
 export type SetupDeps = {
+  /** This local build uses official subscription clients for notes; never download LLM/embedding weights. */
+  subscription?: boolean
   getHardware(): Promise<Hardware>
   /** the catalog in this build; never waits on the network */
   getCatalog(): Promise<Catalog>
@@ -199,6 +201,7 @@ export class SetupController {
   private async run() {
     this.set({ phase: 'checking', fraction: 0 })
     try {
+      if (this.deps.subscription) return await this.runSubscription()
       const [hw, catalog] = await Promise.all([this.deps.getHardware(), this.deps.getCatalog()])
       const llm = pick(hw, catalog.models)
       const weak = tooWeak(hw, !!llm.recommended)
@@ -276,6 +279,18 @@ export class SetupController {
       console.error('setup failed', err)
       this.set({ phase: 'error', fraction: this._state.fraction, message: friendly(err) })
     }
+  }
+
+  private async runSubscription() {
+    const catalog = await this.deps.getCatalog()
+    const selected = this.deps.speed?.load()?.model ?? 'whisper-large-v3-turbo-q5_0'
+    const model = catalog.asr.find(m => m.id === selected)
+    if (!model) throw new Error('The selected speech model is not in this build.')
+    const path = await this.fetch({ url: model.url, sha256: model.sha256, bytes: model.bytes,
+      dir: join(this.deps.modelsDir, 'asr'), fileName: fileNameFor(model.url) }, p => this.set({ phase: 'downloading', fraction: p.fraction }))
+    this.paths = { asr: path, llm: 'subscription' }
+    this.set({ phase: 'ready', fraction: 1, notesUpgradeSkipped: true, notesUpgradeInstalled: false })
+    for (const l of this.notesListeners) l()
   }
 
   /**
@@ -418,4 +433,3 @@ export class SetupController {
     }
   }
 }
-
