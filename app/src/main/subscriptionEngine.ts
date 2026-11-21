@@ -18,6 +18,8 @@ export function subscriptionEnv(): NodeJS.ProcessEnv {
 }
 
 export function subscriptionCli(name: 'claude' | 'codex'): string {
+  // Prefer the current official desktop engine to an older standalone PATH installation.
+  if (name === 'codex' && existsSync('/usr/lib/chatgpt/resources/codex')) return '/usr/lib/chatgpt/resources/codex'
   for (const d of (subscriptionEnv().PATH ?? '').split(':')) {
     const p = join(d, name)
     if (existsSync(p)) return p

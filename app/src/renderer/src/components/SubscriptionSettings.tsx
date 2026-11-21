@@ -11,6 +11,7 @@ export function SubscriptionSettings() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [failed, setFailed] = useState(false)
+  const listed = !choice.startsWith('gpt-') || !state?.codexModels || state.codexModels.some(m => m.id === choice)
   const reload = async () => { const s = await window.yogurt.subscription.status(); setState(s); setChoice(s.model); setEffort(s.effort) }
   useEffect(() => { void reload().catch(e => { setMessage(String(e)); setFailed(true) }) }, [])
   const apply = async () => {
@@ -39,10 +40,10 @@ export function SubscriptionSettings() {
       <div className="settings-row">
         <label htmlFor="subscription-model" className="settings-label settings-row-copy">사용할 모델</label>
         <span className="settings-select-wrap"><select id="subscription-model" data-testid="subscription-model" className="settings-select" value={choice} onChange={e => { setChoice(e.target.value as SubscriptionModel); setMessage('기본 설정 저장을 눌러 적용하세요. 저장에는 모델을 호출하지 않습니다.'); setFailed(false) }} disabled={busy || !state}>
-          {SUBSCRIPTION_MODELS.filter(m => m.provider === (choice.startsWith('gpt-') ? 'codex' : 'claude')).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {SUBSCRIPTION_MODELS.filter(m => m.provider === (choice.startsWith('gpt-') ? 'codex' : 'claude')).map(m => <option key={m.id} value={m.id}>{m.name}{m.provider === 'codex' && state?.codexModels && !state.codexModels.some(a => a.id === m.id) ? ' · 현재 구독 목록에 없음' : ''}</option>)}
         </select><ChevronDown size={14} aria-hidden="true" /></span>
       </div>
-      <div className="settings-row"><div className="settings-row-copy"><p className="settings-label">구독 연결</p><p className="settings-description">{choice.startsWith('gpt-') ? 'ChatGPT 구독 · 공식 Codex 로그인' : 'Claude 구독 · 공식 Claude Code 로그인'} · 요금제와 사용 한도는 로그인한 계정에 적용됩니다.</p></div></div>
+      <div className="settings-row"><div className="settings-row-copy"><p className="settings-label">구독 연결</p><p className="settings-description">{choice.startsWith('gpt-') ? `ChatGPT ${state?.codexPlan && state.codexPlan !== 'unknown' ? state.codexPlan : '구독'} · 공식 Codex 로그인` : 'Claude 구독 · 공식 Claude Code 로그인'} · 요금제와 사용 한도는 로그인한 계정에 적용됩니다.</p>{!listed && <p className="organizer-error">선택한 모델이 이 계정의 현재 구독 목록에 없습니다. 설정값은 유지할 수 있지만, 생성 전에 사용 가능한 모델을 선택해 주세요.</p>}</div></div>
       <div className="settings-row"><label htmlFor="subscription-effort" className="settings-label settings-row-copy">추론 강도</label><span className="settings-select-wrap"><select id="subscription-effort" data-testid="subscription-effort" className="settings-select" value={effort} disabled={busy || !state} onChange={e => setEffort(e.target.value as ReasoningEffort)}>{REASONING_EFFORTS.map(e => <option key={e} value={e}>{e === 'xhigh' ? 'xhigh · 매우 높음' : e}</option>)}</select><ChevronDown size={14} aria-hidden="true" /></span></div>
       <div className="settings-row"><div className="settings-row-copy">
         <p className="settings-label">{state ? SUBSCRIPTION_MODELS.find(m => m.id === state.model)?.name : '연결 확인 중…'}</p>

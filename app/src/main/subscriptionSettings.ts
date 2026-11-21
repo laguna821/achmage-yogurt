@@ -4,6 +4,7 @@ import { existsSync, lstatSync, rmSync } from 'node:fs'
 import { loadSettings, updateSettings } from './settings'
 import { runSubscription, subscriptionLogin } from './subscriptionEngine'
 import { SUBSCRIPTION_MODELS, subscriptionModel, reasoningEffort, type SubscriptionCheck, type SubscriptionModel } from '../shared/subscription'
+import { subscriptionMetadata } from './subscriptionMetadata'
 
 /** Only downloaded AI weights. No database, transcript or recording is in this list. */
 export function localAiFiles(profile: string) {
@@ -13,7 +14,10 @@ export const localAiBytes = (profile: string) => localAiFiles(profile).reduce((n
 
 export function hookSubscriptionSettings(profile: string, busy: () => boolean) {
   const file = join(profile, 'settings.json'), cwd = join(profile, 'subscription-runtime')
-  ipcMain.handle('subscription:status', async () => ({ model: subscriptionModel(loadSettings(file).aiModel), effort: reasoningEffort(loadSettings(file).aiReasoningEffort), claude: await subscriptionLogin('claude', cwd), codex: await subscriptionLogin('codex', cwd), localModelBytes: localAiBytes(profile) }))
+  ipcMain.handle('subscription:status', async () => {
+    const [claude, codex, metadata] = await Promise.all([subscriptionLogin('claude', cwd), subscriptionLogin('codex', cwd), subscriptionMetadata()])
+    return { model: subscriptionModel(loadSettings(file).aiModel), effort: reasoningEffort(loadSettings(file).aiReasoningEffort), claude, codex, ...metadata, localModelBytes: localAiBytes(profile) }
+  })
   ipcMain.handle('subscription:apply', async (_e, choice: unknown, effort: unknown): Promise<SubscriptionCheck> => {
     if (!SUBSCRIPTION_MODELS.some(m => m.id === choice)) return { ok: false, message: '지원하지 않는 모델입니다.' }
     if (busy()) return { ok: false, message: '현재 요약이나 답변이 끝난 뒤 모델을 변경하세요.' }
