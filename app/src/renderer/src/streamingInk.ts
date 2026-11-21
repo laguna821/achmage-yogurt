@@ -33,6 +33,9 @@ export const StreamingInk = Extension.create({
             }
           })
           const now = performance.now(), decorations: Decoration[] = []
+          // A subscription client can deliver a whole long record in one event.
+          // Thousands of range measurements and SVG filters would stall the UI.
+          if (text.length > 8000) return { ...mode, reduced: true, decorations: DecorationSet.empty }
           let piece = 0
           for (const word of arrivals.update(text, now)) {
             while (piece < pieces.length && pieces[piece].to <= word.from) piece++
