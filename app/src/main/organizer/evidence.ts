@@ -64,6 +64,7 @@ export async function vaultEvidence(issues: RecordIssue[], seed: string, signal?
         queries.splice(n + 1, 0, ...originals)
       }
     }
+    status.detail = evidence.length ? `볼트에서 관련 자료 ${evidence.length}건을 읽었습니다.` : '볼트에서 일치하는 자료를 찾지 못했습니다.'
   } catch (e) { if (signal?.aborted) throw e; status.connected = false; status.detail = '볼트 검색 일부 실패 · 확인하지 못한 항목은 질문으로 남깁니다.'; log.push(status.detail) }
   finally { client.close() }
   return { evidence, status, log }

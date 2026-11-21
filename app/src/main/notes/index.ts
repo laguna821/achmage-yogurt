@@ -236,7 +236,7 @@ export function hookNotes(p: {
   const afterStop = new Map<string, Promise<void>>()
   p.onStop((m) => {
     if (p.manual) {
-      const done = p.transcribed(m.id).then(() => { if (p.store.meeting(m.id)?.state === 'stopped') p.store.updateMeeting(m.id, {state: 'done'}); p.changed(m.id); p.send(view(m.id)) }).finally(() => afterStop.delete(m.id))
+      const done = p.transcribed(m.id).then(() => { if (p.store.meeting(m.id)?.state === 'stopped') p.store.updateMeeting(m.id, {state: 'done'}); p.changed(m.id); p.send(view(m.id)) }).catch(e => console.error('transcript preparation after the meeting failed', e)).finally(() => afterStop.delete(m.id))
       afterStop.set(m.id, done); return
     }
     set(m.id, 'waiting')

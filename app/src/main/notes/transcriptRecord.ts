@@ -2,8 +2,8 @@ import type { Llm, PromptInput } from './enhance'
 import { OutputLimitError } from '../outputLimit'
 
 /** App adaptation of achmage-transcript 0.3.0, pinned in ACHMAGE-TRANSCRIPT.md.
- * The source skill stays untouched. This client has transcript/notes/attendee evidence,
- * not the skill host's vault, mail or web tools; unresolved facts stay unresolved.
+ * The source skill stays untouched. The text client receives only source and host-provided
+ * evidence receipts; read-only connectors run in the host. Unresolved facts stay unresolved.
  */
 export const RECORD_TOKENS = 24_000
 export const EVIDENCE_TOKENS = 16_000
