@@ -17,6 +17,7 @@ describe('context-first organizer', () => {
   it('bounds source excerpts and never upgrades invented citations into confirmed facts', () => {
     const evidence: Evidence[] = Array.from({length:4},(_,n)=>({id:`V${n}`,provider:'vault',title:'자료',locator:'source',text:'가'.repeat(7000),issueIds:['I1']}))
     expect(JSON.parse(evidencePacket(evidence,10000)).reduce((n:number,e:any)=>n+e.text.length,0)).toBe(10000)
+    expect(JSON.parse(evidencePacket(evidence,10000)).map((e:any)=>e.id)).toEqual(['V0','V1','V2','V3'])
     expect(validateFindings([{issueId:'I1',value:'12일',confidence:'confirmed',sourceIds:['invented']}],[issue],evidence)[0].confidence).toBe('unresolved')
     expect(publicEntity('someone@example.com')).toBeUndefined();expect(publicEntity('힉스필드')).toBe('힉스필드')
     expect(()=>parseJson('not JSON')).toThrow('구조')
@@ -26,9 +27,10 @@ describe('context-first organizer', () => {
     const dir=mkdtempSync(join(tmpdir(),'yogurt-organizer-'));dirs.push(dir)
     const app=new Organizer(dir,resolve('resources/achmage-transcript'),()=>{})
     app.configure('meeting',{kind:'conversation',profile:'record',vault:false,mail:false,web:false},{notes:'',participants:'',links:''})
+    app.attach('meeting',[{id:'fixture',provider:'attached',title:'원자료',locator:'fixture.txt',text:'독립 자료의 마지막 문장도 검수에 도달한다.',issueIds:[]}])
     let calls=0
     const replies=[{kind:'conversation',seedQuery:'일정',glossary:[],roster:[],issues:[issue]}, {findings:[{issueId:'I1',original:'다음 주',value:'미정',confidence:'unresolved',sourceIds:[],basis:'합의되지 않음'}],speakers:[{label:'me',name:'김 교수',confidence:'confirmed',sourceIds:[],scope:'전체',basis:'추정'}],questions:[]}, md,md,{questions:[{issueId:'I1',question:'날짜를 확정했나요?',options:['미정 유지','날짜 지정'],defaultAnswer:'미정 유지',basis:'발언에서 확정하지 않음'}],notes:[]}]
-    const llm:Llm={contextSize:900000,count:async xs=>xs.map(x=>x.length),chat:async(p,t)=>{expect(p).toContain('날짜는 아직 미정입니다.');const r=replies[calls++];const text=typeof r==='string'?r:JSON.stringify(r);t(text);return text}}
+    const llm:Llm={contextSize:900000,count:async xs=>xs.map(x=>x.length),chat:async(p,t)=>{expect(p).toContain('날짜는 아직 미정입니다.');expect(p).toContain('독립 자료의 마지막 문장도 검수에 도달한다.');const r=replies[calls++];const text=typeof r==='string'?r:JSON.stringify(r);t(text);return text}}
     const output=await app.run('meeting',source,llm,()=>{},Date.now())
     expect(output).toBe(md);app.complete('meeting',output)
     const state=app.get('meeting');expect(state.phase).toBe('questions');expect(state.speakers[0].confidence).toBe('unresolved')

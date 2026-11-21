@@ -35,7 +35,8 @@ export function subscriptionArgs(model: SubscriptionModel, effort: ReasoningEffo
 }
 
 export function subscriptionError(model: SubscriptionModel, detail: string): string {
-  if (/model_not_found|not supported|model.*not found|does not exist|not have access/i.test(detail)) return `${model}: 현재 구독 계정에서 이 모델을 사용할 수 없습니다. 설정에서 연결을 확인하고 사용 가능한 모델을 선택하세요.`
+  if (/(reasoning|effort).*(unsupported|not supported|invalid)|unsupported.*(reasoning|effort)/i.test(detail)) return `${model}: 요청한 추론 강도를 모델 또는 CLI가 지원하지 않습니다. 설정에서 추론 강도와 CLI 버전을 확인하세요.`
+  if (/model_not_found|not supported|model.*not found|does not exist|not have access/i.test(detail)) return `${model}: 모델을 실행하지 못했습니다. CLI의 모델 지원 버전과 구독 접근을 확인하세요. 다른 모델로 자동 전환하지 않았습니다.`
   if (/not logged|log in|login|unauthorized|authentication|401/i.test(detail)) return '구독 로그인이 필요합니다. 공식 Claude Code 또는 Codex에서 로그인한 뒤 다시 확인하세요.'
   if (/rate.limit|usage.limit|limit.*reached|quota|429/i.test(detail)) return '구독 사용 한도에 도달했습니다. 사용량이 회복된 뒤 다시 시도하세요. 모델을 자동으로 변경하지 않았습니다.'
   return `구독 모델 실행에 실패했습니다 (${model}). ${detail.replace(/\s+/g, ' ').slice(0, 240)}`

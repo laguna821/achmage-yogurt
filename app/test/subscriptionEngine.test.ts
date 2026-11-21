@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runSubscription, subscriptionAnswer, subscriptionArgs, subscriptionEnv } from '../src/main/subscriptionEngine'
+import { runSubscription, subscriptionAnswer, subscriptionArgs, subscriptionEnv, subscriptionError } from '../src/main/subscriptionEngine'
 
 const dirs: string[] = []
 const cwd = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-sub-test-')); dirs.push(d); return d }
@@ -37,7 +37,8 @@ describe('official subscription client bridge', () => {
   })
   it('surfaces a rejected target instead of returning partial text or choosing another model', async () => {
     const command = fixture(`process.stdin.resume();process.stdin.on('end',()=>{console.log(JSON.stringify({type:'turn.failed',error:{message:'model_not_found: not supported'}}));process.exitCode=1;});`)
-    await expect(runSubscription('gpt-6.2-sol', request, cwd(), () => {}, undefined, command)).rejects.toThrow('현재 구독 계정에서 이 모델을 사용할 수 없습니다')
+    await expect(runSubscription('gpt-6.2-sol', request, cwd(), () => {}, undefined, command)).rejects.toThrow('CLI의 모델 지원 버전과 구독 접근')
+    expect(subscriptionError('gpt-6.2-sol', 'reasoning effort xhigh is not supported')).toContain('추론 강도')
   })
   it('cancels the actual child while waiting for output without returning an incomplete summary', async () => {
     const abort = new AbortController()

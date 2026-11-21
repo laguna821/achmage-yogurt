@@ -575,7 +575,7 @@ app.whenReady().then(() => {
   const readsAhead = false
   // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
   const engine = isFake() ? new FakeEngine() : new SubscriptionEngine(() => subscriptionModel(loadSettings(settingsFile).aiModel), join(userDataDir(), 'subscription-runtime'), () => reasoningEffort(loadSettings(settingsFile).aiReasoningEffort))
-  if (!isFake()) hookSubscriptionSettings(userDataDir(), () => engine instanceof SubscriptionEngine && engine.busy)
+  if (!isFake()) hookSubscriptionSettings(userDataDir(), () => !!organizerHost?.organizer.running || engine instanceof SubscriptionEngine && engine.busy)
   // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
   const smallMac = isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem())
   const model = createNotesModel({ engine, recordMode: !isFake(), modelPath: () => isFake() ? setup.notesPath() : setup.notesPath() ? `subscription:${subscriptionModel(loadSettings(settingsFile).aiModel)}` : undefined, onLoaded: path => setup.notesModelLoaded(path) })

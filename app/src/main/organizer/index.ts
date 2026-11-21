@@ -27,7 +27,7 @@ export function validateIssues(raw: unknown): RecordIssue[] {
 export function evidencePacket(evidence: Evidence[], budget = 100_000): string {
   // Bounded relevant excerpts, not the user's whole vault/mail. Full receipts stay local in the ledger.
   let room = budget
-  return JSON.stringify(evidence.map(e => { const text = e.provider === 'transcript' ? '원문 전체는 이 요청의 SOURCE에 실려 있습니다.' : e.text.slice(0, Math.max(0, Math.min(e.text.length, room))); room -= text.length; return { ...e, imagePath: undefined, text, excerptOnly: text.length !== e.text.length } }).filter(e => e.text))
+  return JSON.stringify(evidence.map((e, n) => { const body = e.provider === 'transcript' ? '원문 전체는 이 요청의 SOURCE에 실려 있습니다.' : e.text; const text = body.slice(0, Math.max(0, Math.min(body.length, Math.floor(room / (evidence.length - n))))); room -= text.length; return { ...e, imagePath: undefined, text, excerptOnly: text.length !== e.text.length } }).filter(e => e.text))
 }
 function citations(raw: unknown, evidence: Evidence[]): string[] {
   const ids = new Set(evidence.map(e => e.id))
@@ -51,6 +51,7 @@ export class Organizer {
   private states = new Map<string, OrganizerState>()
   private busy = new Set<string>()
   private runtime: TranscriptRuntime
+  get running() { return this.busy.size > 0 }
   constructor(private root: string, skillDir: string, private changed: (s: OrganizerState) => void, private gmail?: GmailConnector) { this.runtime = new TranscriptRuntime(skillDir) }
   private dir(id: string) { if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id)) throw new Error('잘못된 기록입니다.'); return join(this.root, id) }
   get(id: string): OrganizerState {
@@ -153,12 +154,12 @@ export class Organizer {
       if (s.options.mail && await lookup('mail')) await assess()
       if (s.options.web && await lookup('web')) await assess()
       const map: Record<string, any> = { overrides: [] }
-      for (const p of s.speakers) if (p.confidence === 'confirmed' && !input.oneMic && p.label && !/시각|구간|발언|주제|topic|turn/i.test(p.scope)) map[p.label] = p.name
+      for (const p of s.speakers) if (p.confidence === 'confirmed' && !input.oneMic && p.label && !/^(me|them|mic|system|you|나|상대방)$/i.test(p.label) && !/시각|구간|발언|주제|topic|turn/i.test(p.scope)) map[p.label] = p.name
       const corrections = s.findings.filter(f => f.confidence === 'confirmed' && f.original.length >= 3 && f.value && f.original !== f.value && !/\d/.test(f.original + f.value) && input.transcript.includes(f.original)).map(f => ({ from: f.original, to: f.value, basis: f.basis }))
       const named = await this.runtime.apply(work, map, corrections, signal)
       const ledger = () => `# 확인 대장\n\n${JSON.stringify({ kind: s.kind, profile: s.options.profile, issues: s.issues, speakers: s.speakers, corrections: s.findings, questions: s.questions, connectors: s.connectors, checks: s.checks, sources: s.evidence.map(({ text, ...meta }) => meta) }, null, 2)}`
       writeFileSync(join(work, 'ledger.md'), ledger())
-      const packet = JSON.stringify({ sessionKind: s.kind, outputProfile: s.options.profile, findings: s.findings, speakers: s.speakers, questions: s.questions, userAnswers: answers, sources: s.evidence.map(e => ({ id: e.id, title: e.title, locator: e.locator, revision: e.revision })), checkedConnections: s.connectors, preparedOriginalPreserved: true })
+      const packet = JSON.stringify({ sessionKind: s.kind, outputProfile: s.options.profile, findings: s.findings, speakers: s.speakers, questions: s.questions, userAnswers: answers, sources: s.evidence.map(e => ({ id: e.id, title: e.title, locator: e.locator, revision: e.revision })), sourceReceipts: JSON.parse(receipts(s.evidence)), checkedConnections: s.connectors, preparedOriginalPreserved: true })
       const enriched: PromptInput = { ...input, transcript: named, recordEvidence: packet, sessionKind: s.kind, outputProfile: s.options.profile }
       stage('drafting', '확인한 근거를 반영해 논의와 설명을 빠짐없이 정리하고 있습니다.')
       let md = await writeTranscriptRecord(enriched, llm, onToken, step => { if (step === 'checking') stage('checking', '원문·근거와 대조하고 문서 형식과 숫자를 검수하고 있습니다.') })
