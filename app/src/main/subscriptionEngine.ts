@@ -25,7 +25,7 @@ export function subscriptionCli(name: 'claude' | 'codex'): string {
 }
 
 export function subscriptionArgs(model: SubscriptionModel): string[] {
-  if (model === 'claude-sonnet-5-5') return ['--safe-mode', '--print', '--model', model, '--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--no-session-persistence', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', 'dontAsk', '--system-prompt', SYSTEM]
+  if (model === 'claude-sonnet-5-5') return ['--safe-mode', '--print', '--model', model, '--effort', 'medium', '--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--no-session-persistence', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', 'dontAsk', '--system-prompt', SYSTEM]
   return ['exec', '--ignore-user-config', '--ignore-rules', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only', '--model', model, '--json', '--color', 'never', '-c', 'features.shell_tool=false', '-c', 'features.multi_agent=false', '-c', 'features.apps=false', '-c', 'features.plugins=false', '-c', 'features.memories=false', '-c', 'web_search="disabled"', '-c', 'project_doc_max_bytes=0', '-c', 'forced_login_method="chatgpt"', '-c', `developer_instructions=${JSON.stringify(SYSTEM)}`, '-']
 }
 
@@ -51,7 +51,7 @@ export function runSubscription(model: SubscriptionModel, messages: EngineMessag
   mkdirSync(cwd, { recursive: true, mode: 0o700 })
   return new Promise((resolve, reject) => {
     const env = subscriptionEnv()
-    if (maxTokens && model === 'claude-sonnet-5-5') env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(Math.min(32_000, Math.max(256, maxTokens)))
+    if (maxTokens && model === 'claude-sonnet-5-5') env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(Math.min(32_000, Math.max(4096, maxTokens)))
     const child = spawn(command?.binary ?? subscriptionCli(model === 'claude-sonnet-5-5' ? 'claude' : 'codex'), command?.args ?? subscriptionArgs(model), { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] })
     let pending = '', stderr = '', streamed = '', final = '', error = '', bytes = 0, stopped = false, finished = false
     const abort = () => { stopped = true; child.kill('SIGTERM') }
