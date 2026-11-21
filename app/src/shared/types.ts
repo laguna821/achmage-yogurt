@@ -23,9 +23,24 @@ export type MeetingCard = StoredMeetingCard & { paused?: true }
 
 /** What the window sees of the app: window.yogurt (the preload bridge, contextIsolation on) */
 export type YogurtApi = {
+  organizer: {
+    get(id: string): Promise<import('./organizer').OrganizerState>
+    configure(id: string, options: import('./organizer').OrganizerOptions, context: import('./organizer').OrganizerContext): Promise<import('./organizer').OrganizerState>
+    attach(id: string): Promise<import('./organizer').OrganizerState>
+    attachBytes(id: string, files: {name: string; data: string}[]): Promise<import('./organizer').OrganizerState>
+    pasteImage(id: string): Promise<import('./organizer').OrganizerState>
+    remove(id: string, evidenceId: string): Promise<import('./organizer').OrganizerState>
+    start(id: string): Promise<void>
+    answer(id: string, answers: Record<string,string>, defaults?: boolean): Promise<void>
+    openWork(id: string): Promise<void>
+    mailSearch(id: string, query: string): Promise<import('./organizer').OrganizerState>
+    onChange(cb: (state: import('./organizer').OrganizerState) => void): () => void
+    gmail: {status(): Promise<import('../main/organizer/gmail').GmailStatus>; importClient(): Promise<import('../main/organizer/gmail').GmailStatus>; connect(): Promise<import('../main/organizer/gmail').GmailStatus>; disconnect(): Promise<import('../main/organizer/gmail').GmailStatus>; guide(): Promise<void>}
+  }
   subscription: {
     status(): Promise<import('./subscription').SubscriptionStatus>
-    apply(model: import('./subscription').SubscriptionModel): Promise<import('./subscription').SubscriptionCheck>
+    apply(model: import('./subscription').SubscriptionModel, effort?: import('./subscription').ReasoningEffort): Promise<import('./subscription').SubscriptionCheck>
+    test(): Promise<import('./subscription').SubscriptionCheck>
     removeLocal(): Promise<number>
   }
   platform: NodeJS.Platform

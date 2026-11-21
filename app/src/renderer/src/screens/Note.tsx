@@ -1,3 +1,4 @@
+import { OrganizerWorkspace } from '../components/OrganizerWorkspace'
 import { citationTargetIndex } from '../../../shared/citations'
 import { NoteReadingPane } from '../components/NoteReadingPane'
 import type { LibrarySource } from '../../../shared/types'
@@ -87,7 +88,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const [finishRequested, requestFinish] = useState(false)
   const reducedMotion = useReducedMotion()
   const summaryState = useSummaryPresentation(notes, reducedMotion)
-  const hasEnhanced = m?.id === id && m.state !== 'prepared' && m.state !== 'recording' && !!notes && notes.status !== 'idle'
+  const hasEnhanced = m?.id === id && m.state !== 'prepared' && m.state !== 'recording' && !!notes && (!window.yogurt.fake || notes.status !== 'idle')
   // Reduced motion selects Summary in the very render that first exposes its tab.
   const instantSummary = finishRequested && hasEnhanced && reducedMotion
   const view = instantSummary ? 'enhanced' : viewState
@@ -110,6 +111,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const notesButton = useRef<HTMLButtonElement>(null)
   const summaryButton = useRef<HTMLButtonElement>(null)
   const [confirming, setConfirming] = useState(false)
+  const [organizerOpen, setOrganizerOpen] = useState(false)
   const rewriteButton = useRef<HTMLButtonElement>(null)
   const [editedHere, setEditedHere] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -297,6 +299,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
     : mineSave.status === 'saving' || enhancedSave.status === 'saving' ? 'saving' : 'saved'
   const dismissRewrite = () => { setConfirming(false); rewriteButton.current?.focus({ preventScroll: true }) }
   const writeAgain = async () => {
+    if (!window.yogurt.fake) { pick('enhanced'); setOrganizerOpen(true); return }
     const confirmed = confirming
     // Confirm is a completed choice; do not offer a Cancel UI while its save is still pending.
     if (confirmed) dismissRewrite()
@@ -379,13 +382,13 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
             </button>
             {hasEnhanced && <button ref={summaryButton} id="note-summary-tab" data-testid="note-summary-tab" role="tab" aria-selected={primary === 'notes' && shown === 'enhanced'} aria-controls="note-notes-panel"
               tabIndex={primary === 'notes' && shown === 'enhanced' ? 0 : -1} onKeyDown={primaryKey}
-              onClick={(e) => pickTab('notes', 'enhanced', e.detail > 0)}>
-              <Sparkles size={14} strokeWidth={1.75} aria-hidden="true" />{t('Summary')}
+              onClick={(e) => { pickTab('notes', 'enhanced', e.detail > 0); if (!window.yogurt.fake && notes.enhanced == null) setOrganizerOpen(true) }}>
+              <Sparkles size={14} strokeWidth={1.75} aria-hidden="true" />{window.yogurt.fake ? t('Summary') : '정리'}
             </button>}
             </div>
             {primary === 'transcript' && <div ref={setTranscriptToolbar} className="note-primary-tools" />}
             <span data-testid="note-tab-indicator" className="note-tab-indicator" aria-hidden="true" />
-            {hasEnhanced && primary === 'notes' && <SummaryActions menuButton={rewriteButton} hasSummary={notes.enhanced != null} canWriteAgain={notes.status === 'done' || notes.status === 'failed' || notes.status === 'empty'} onWriteAgain={() => { pick('enhanced'); writeAgain() }} />}
+            {hasEnhanced && primary === 'notes' && <SummaryActions menuButton={rewriteButton} hasSummary={notes.enhanced != null} canWriteAgain={notes.status === 'done' || notes.status === 'failed' || notes.status === 'empty' || notes.status === 'idle'} onWriteAgain={() => { pick('enhanced'); writeAgain() }} />}
           </div>
         </header>
         <div ref={setChatAnchor} className="note-reading-area">
@@ -395,7 +398,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
                   focus={primary === 'notes' && at?.ms === null ? at : undefined} testId="note-mine" label={t('My notes')} className="min-h-[40vh]" markdown={notes.mine} placeholder={t('You can add notes here to guide the summary.')}
                   onChange={(md) => { typing.current = true; const next = { ...current.current!, mine: md }; current.current = next; setNotes(next); mineSave.change(md) }}
                   onBlur={() => { typing.current = false; mineSave.flush() }}
-                /> : <Enhanced key={id} presentation={summaryState} focus={primary === 'notes' && at?.ms === null ? at : undefined} notes={notes} disabled={starting} onChange={(md) => { setEditedHere(true); const next = { ...current.current!, enhanced: md }; current.current = next; setNotes(next); enhancedSave.change(md) }} onBlur={enhancedSave.flush} onRetry={writeAgain} />}
+                /> : <>{!window.yogurt.fake && <OrganizerWorkspace key={`organizer-${id}`} id={id} open={organizerOpen} setOpen={setOrganizerOpen} edited={notes.edited || editedHere} beforeStart={async () => { if (!await saveAll()) return false; setEditedHere(false); return true }} />}<Enhanced key={id} presentation={summaryState} focus={primary === 'notes' && at?.ms === null ? at : undefined} notes={notes} disabled={starting} onChange={(md) => { setEditedHere(true); const next = { ...current.current!, enhanced: md }; current.current = next; setNotes(next); enhancedSave.change(md) }} onBlur={enhancedSave.flush} onRetry={writeAgain} /></>}
           </NoteReadingPane>
           {(primary === 'transcript' || transcriptVisited) && <section hidden={primary !== 'transcript'} id="note-transcript-panel" role="tabpanel" aria-labelledby="note-transcript-tab" className="note-content note-transcript-pane">
             <Transcript id={id} recording={recording} active={primary === 'transcript'} inline toolbar={transcriptToolbar} focus={at?.ms != null ? { ...at, ms: at.ms } : undefined} />

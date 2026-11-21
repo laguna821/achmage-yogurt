@@ -16,7 +16,7 @@ afterEach(() => {
 })
 const wait = (ms = 5) => new Promise((r) => setTimeout(r, ms))
 
-function setup(o: { summaryLanguage?: () => string; me?: string; named?: () => Promise<void>; namesWaitMs?: number; reply?: string | ((prompt: string) => string); during?: () => void; load?: Promise<void>; title?: string; recording?: () => boolean; smallMac?: boolean; showLoading?: boolean } = {}) {
+function setup(o: { manual?: boolean; summaryLanguage?: () => string; me?: string; named?: () => Promise<void>; namesWaitMs?: number; reply?: string | ((prompt: string) => string); during?: () => void; load?: Promise<void>; title?: string; recording?: () => boolean; smallMac?: boolean; showLoading?: boolean } = {}) {
   const d = mkdtempSync(join(tmpdir(), 'yogurt-notes-'))
   dirs.push(d)
   const store = openStore(join(d, 'yogurt.db'))
@@ -36,7 +36,7 @@ function setup(o: { summaryLanguage?: () => string; me?: string; named?: () => P
   }
   const queue = createQueue({ recording: o.recording ?? (() => false), smallMac: o.smallMac ?? false })
   const notes = hookNotes({
-    store, queue, model: { llm: async () => { await o.load; return llm }, needsLoad: () => true }, showLoading: o.showLoading,
+    manual: o.manual, store, queue, model: { llm: async () => { await o.load; return llm }, needsLoad: () => true }, showLoading: o.showLoading,
     transcribed: () => transcript, named: o.named, namesWaitMs: o.namesWaitMs, language: () => 'spanish', summaryLanguage: o.summaryLanguage,
     onStop: (fn) => stops.push(fn), send: (v) => sent.push(v), changed: (id) => changed.push(id), peopleRewriteMs: 30, me: () => o.me ?? '',
   })
@@ -44,6 +44,11 @@ function setup(o: { summaryLanguage?: () => string; me?: string; named?: () => P
 }
 
 describe('hookNotes', () => {
+  it('manual organization never calls a model merely on recording stop or recovery', async () => {
+    const s = setup({manual: true}); s.stop(); s.transcribed(); await s.notes.written(s.m.id); s.notes.recover(); await wait();
+    expect(s.prompts).toHaveLength(0); expect(s.store.notes(s.m.id).enhanced).toBeNull(); expect(s.notes.view(s.m.id).status).toBe('idle');
+    await s.notes.writeAgain(s.m.id); expect(s.prompts.length).toBeGreaterThan(0);
+  })
   it('off a Mac, a note waiting on the model to load says so; then it writes', async () => {
     let release!: () => void
     const load = new Promise<void>((resolve) => { release = resolve })

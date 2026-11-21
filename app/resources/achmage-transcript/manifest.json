@@ -1,0 +1,16 @@
+{
+  "version": "0.3.0",
+  "sourceSkillSha256": "fe72b3524969cfd79bf14ea162e8d42e494e1f76b50f2939eb5aee8fa31fe5b3",
+  "files": {
+    "SKILL.md": "fe72b3524969cfd79bf14ea162e8d42e494e1f76b50f2939eb5aee8fa31fe5b3",
+    "scripts/transcript.py": "d04dcc88fe9b48392506c14933baba39752346932e7fec5b796ddb5cce12cdf5",
+    "references/writing.md": "5c20dc634312e6d309de235da0f069e57389fe1198e1955881449cd64884b9e2",
+    "references/format.md": "e4191e81bd71fb3f733a24670ed1e85ba2e964f4bcd50bda06a6a28b2f315d05",
+    "references/diagrams.md": "135ef60fec1f8e41aeb516a341a3c0e4d3f86a1b8285bff168cb53ba9bd34dc2",
+    "references/corrections.md": "1c4c104535391d77d9303d98cb51b1399af6dcbdb51cbc79bf311e6fe26ac0da",
+    "references/speakers.md": "4e6759eb2482146f4cad4653708ba81dc0a01c7b630bca518d8654b2449f9f86",
+    "references/hitl.md": "703992086c35cac69fd2f7a375b7dfa544a5dd9c05af68cd129b95f371082afd",
+    "references/minutes.md": "b61ef5f511b3cd61828911f5d1502c49b3bad3e296cee6af62eb54db59dee867",
+    "assets/ledger-template.md": "4f8f865e0a889edad950ecf9fc5afc056069acba8cc0bc1a7580b6521cff6a94"
+  }
+}

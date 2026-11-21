@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { existsSync, lstatSync, rmSync } from 'node:fs'
 import { loadSettings, updateSettings } from './settings'
 import { runSubscription, subscriptionLogin } from './subscriptionEngine'
-import { SUBSCRIPTION_MODELS, subscriptionModel, type SubscriptionCheck, type SubscriptionModel } from '../shared/subscription'
+import { SUBSCRIPTION_MODELS, subscriptionModel, reasoningEffort, type SubscriptionCheck, type SubscriptionModel } from '../shared/subscription'
 
 /** Only downloaded AI weights. No database, transcript or recording is in this list. */
 export function localAiFiles(profile: string) {
@@ -13,17 +13,22 @@ export const localAiBytes = (profile: string) => localAiFiles(profile).reduce((n
 
 export function hookSubscriptionSettings(profile: string, busy: () => boolean) {
   const file = join(profile, 'settings.json'), cwd = join(profile, 'subscription-runtime')
-  ipcMain.handle('subscription:status', async () => ({ model: subscriptionModel(loadSettings(file).aiModel), claude: await subscriptionLogin('claude', cwd), codex: await subscriptionLogin('codex', cwd), localModelBytes: localAiBytes(profile) }))
-  ipcMain.handle('subscription:apply', async (_e, choice: unknown): Promise<SubscriptionCheck> => {
+  ipcMain.handle('subscription:status', async () => ({ model: subscriptionModel(loadSettings(file).aiModel), effort: reasoningEffort(loadSettings(file).aiReasoningEffort), claude: await subscriptionLogin('claude', cwd), codex: await subscriptionLogin('codex', cwd), localModelBytes: localAiBytes(profile) }))
+  ipcMain.handle('subscription:apply', async (_e, choice: unknown, effort: unknown): Promise<SubscriptionCheck> => {
     if (!SUBSCRIPTION_MODELS.some(m => m.id === choice)) return { ok: false, message: '지원하지 않는 모델입니다.' }
     if (busy()) return { ok: false, message: '현재 요약이나 답변이 끝난 뒤 모델을 변경하세요.' }
     const model = choice as SubscriptionModel
     const login = await subscriptionLogin(model === 'claude-sonnet-5-5' ? 'claude' : 'codex', cwd)
     if (!login.loggedIn) return { ok: false, message: login.label }
+    updateSettings(file, { aiModel: model, aiReasoningEffort: reasoningEffort(effort), autoUpdate: false })
+    return { ok: true, message: `${SUBSCRIPTION_MODELS.find(m => m.id === model)!.name} · ${reasoningEffort(effort)} 저장 완료. 모델 호출은 하지 않았습니다.` }
+  })
+  ipcMain.handle('subscription:test', async (): Promise<SubscriptionCheck> => {
+    if (busy()) return { ok: false, message: '현재 작업이 끝난 뒤 연결을 시험하세요.' }
+    const settings = loadSettings(file), model = subscriptionModel(settings.aiModel)
     try {
-      const result = await runSubscription(model, [{ role: 'user', content: 'Reply with exactly YOGURT_CONNECTION_OK and nothing else.' }], cwd, () => {}, AbortSignal.timeout(45_000))
+      const result = await runSubscription(model, [{ role: 'user', content: 'Reply with exactly YOGURT_CONNECTION_OK and nothing else.' }], cwd, () => {}, AbortSignal.timeout(90_000), undefined, 4096, reasoningEffort(settings.aiReasoningEffort))
       if (!result.includes('YOGURT_CONNECTION_OK')) return { ok: false, message: '모델 연결 응답을 확인하지 못했습니다. 기존 설정을 유지합니다.' }
-      updateSettings(file, { aiModel: model, autoUpdate: false })
       return { ok: true, message: `${SUBSCRIPTION_MODELS.find(m => m.id === model)!.name} 연결 확인 및 적용 완료` }
     } catch (e) { return { ok: false, message: e instanceof Error ? e.message : '연결을 확인하지 못했습니다.' } }
   })

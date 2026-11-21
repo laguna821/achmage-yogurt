@@ -16,6 +16,7 @@ import { CalendarSettings } from '../components/CalendarSettings'
 import { supportedKinds } from '../../../shared/platform'
 import { Swap, SwapText } from '../components/Swap'
 import { SubscriptionSettings } from '../components/SubscriptionSettings'
+import { SourceConnectionSettings } from '../components/SourceConnectionSettings'
 
 const THEMES = () => [['system', osWords({ mac: t('Match my Mac'), windows: t('Match Windows'), linux: t('Match my system') })], ['light', t('Light')], ['dark', t('Dark')]] as const
 // each computer's own words for starting at login and its icon's place: the menu bar, the notification area, the tray
@@ -25,6 +26,7 @@ const trayLabel = () => window.yogurt.os === 'win32' ? t('Show Yogurt in the not
 /** Settings, kept small: what Yogurt may use, your name, open at login, stop when the call ends, light or dark, a backup and updates. Nothing technical. */
 /** focus: the setting a toast's Settings button opens, recordings or notes-model */
 export function Settings({ revision = 0, focus }: { revision?: number; focus?: string }) {
+  const [section, setSection] = useState(() => window.yogurt.fake ? 'general' : sessionStorage.getItem('settings-section') || 'general')
   const [perms, setPerms] = useState<PermissionStatus>()
   const [prefs, setPrefs] = useState<{ theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; appVisibility: AppVisibility; myName: string; macName: string; stopWhenCallEnds: boolean; recordingReminder: boolean; keepRecordings: boolean }>()
   const [name, setName] = useState('')
@@ -74,7 +76,8 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
       <div className="settings-scroll" ref={scroll}>
         <div className="settings-content">
           <h1 data-testid="settings-heading" className="settings-heading">{t('Settings')}</h1>
-          {!window.yogurt.fake && <SubscriptionSettings />}
+          {!window.yogurt.fake && <><nav className="settings-section-tabs" aria-label="설정 종류">{[['general','기본 설정'],['ai','AI 구독·모델'],['sources','자료 연결']].map(([key,label]) => <button key={key} data-testid={`settings-section-${key}`} aria-pressed={section === key} onClick={() => { setSection(key); sessionStorage.setItem('settings-section',key) }}>{label}</button>)}</nav>{section === 'ai' && <SubscriptionSettings />}{section === 'sources' && <SourceConnectionSettings />}</>}
+          <div hidden={!window.yogurt.fake && section !== 'general'}>
 
           <h2 className="settings-section-heading">{t('General')}</h2>
           <div className="settings-group"><LoadingContent pending={!prefs} testId="settings-loading" onReady={() => setGeneralReady(true)}>
@@ -177,6 +180,7 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
           </dl>
 
           <p className="settings-privacy"><Lock size={12} aria-hidden="true" />{t('Yogurt stores your meetings, notes and audio on this computer.')}</p>
+          </div>
         </div>
       </div>
     </div>

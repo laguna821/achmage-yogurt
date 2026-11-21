@@ -45,6 +45,9 @@ export function hookNotes(p: {
   peopleRewriteMs?: number
   /** the person's own name, so the invite's other person is known */
   me?: () => string
+  manual?: boolean
+  organize?: (id: string, input: import('./enhance').PromptInput, llm: Llm, onToken: (s: string) => void, signal: AbortSignal) => Promise<string>
+  organized?: (id: string, md: string) => void
 }) {
   const resuming = new Map<string, object>()
   const live = new Map<string, { status: NoteStatus; draft: string; part?: { part: number; of: number }; step?: NoteView['step'] }>()
@@ -140,7 +143,7 @@ export function hookNotes(p: {
       // a generic title (or one made from earlier notes) gets one from these notes; theirs or the calendar's never
       const retitle = (x: Meeting) => x.titleSource === 'generic' || x.titleSource === 'auto'
       let askTitle: ((llm: Llm) => Promise<string>) | undefined
-      const md = await enhance({ meeting: m, mine, segments, language, summaryLanguage: p.summaryLanguage?.(), me: p.me?.(), words: meetingWords(m), ...(retitle(m) ? { titleLater: (ask) => { askTitle = ask } } : {}) }, llm, (t) => {
+      const md = await enhance({ ...(p.organize ? { organize: (i, model, token) => p.organize!(id, i, model, token, signal) } : {}), meeting: m, mine, segments, language, summaryLanguage: p.summaryLanguage?.(), me: p.me?.(), words: meetingWords(m), ...(retitle(m) ? { titleLater: (ask) => { askTitle = ask } } : {}) }, llm, (t) => {
         if (quiet) return
         draft += t
         if (timer) return
@@ -167,6 +170,7 @@ export function hookNotes(p: {
       // the person's own notes stay as they typed them, even if they typed on while this was written
       p.store.setNotes(id, { enhanced: md, edited: false })
       p.store.setWrittenWith(id, used.stamp)
+      p.organized?.(id, md)
       finish(m, 'done')
       queueTitle(id, askTitle, m.attendees)
       p.summarized?.(id)
@@ -231,6 +235,10 @@ export function hookNotes(p: {
   /** each meeting's notes after it stopped, until they are written */
   const afterStop = new Map<string, Promise<void>>()
   p.onStop((m) => {
+    if (p.manual) {
+      const done = p.transcribed(m.id).then(() => { if (p.store.meeting(m.id)?.state === 'stopped') p.store.updateMeeting(m.id, {state: 'done'}); p.changed(m.id); p.send(view(m.id)) }).finally(() => afterStop.delete(m.id))
+      afterStop.set(m.id, done); return
+    }
     set(m.id, 'waiting')
     const done = (async () => {
       await p.transcribed(m.id)
@@ -275,6 +283,7 @@ export function hookNotes(p: {
      * again on their own, once the changes settle, out of sight. Edited notes keep the "People changed" hint instead.
      */
     applyPeople(id: string, retitle = true) {
+      if (p.manual) { p.send(view(id)); return }
       const refreshTitle = retitle || rewriteTimers.has(id)
       clearTimeout(rewriteTimers.get(id)); rewriteTimers.delete(id)
       const due = () => { const n = currentNotes(id); return !resuming.has(id) && p.store.meeting(id)?.state !== 'recording' && n.enhanced != null && !n.edited && !live.has(id) && !rewriting.has(id) && peopleChanged(id, true) }
@@ -312,6 +321,7 @@ export function hookNotes(p: {
     },
     /** at launch: meetings a quit or crash left without notes get them now, one at a time */
     recover() {
+      if (p.manual) return
       for (const m of p.store.unenhancedMeetings()) if (!live.has(m.id) && !resuming.has(m.id)) void queueWrite(m.id)
     },
   }

@@ -68,7 +68,7 @@ export function createNotesModel(o: { engine: Engine; modelPath: () => string | 
           // not known while it runs; the worker skips what it already holds, so knowing less only costs a check
           held = ''
           let wrote = false
-          const ask = () => o.engine.chat({ messages, ...(opts?.maxTokens ? { maxTokens: opts.maxTokens } : {}), ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}) }, (t) => { wrote = true; onToken(t) }, signal)
+          const ask = () => o.engine.chat({ messages, ...(opts?.images ? { images: opts.images } : {}), ...(opts?.maxTokens ? { maxTokens: opts.maxTokens } : {}), ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}) }, (t) => { wrote = true; onToken(t) }, signal)
           // no word came on the graphics card: loaded again without it, and asked again (nothing was shown yet)
           let first = true
           return again(async () => { if (!first) await ensure(); first = false; return ask() }, () => !wrote && !signal?.aborted)

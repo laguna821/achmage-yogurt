@@ -16,7 +16,7 @@ type Limits = typeof WATCH
 /** Vulkan's "the graphics card was reset" (a driver hang): the process that saw it can never use the card again */
 export const deviceLost = (message: string): boolean => /ErrorDeviceLost|VK_ERROR_DEVICE_LOST/i.test(message)
 
-export type ChatRequest = { messages: EngineMessage[]; maxTokens?: number; thoughtBudget?: number; /** instead of the family's sampling temperature */ temperature?: number }
+export type ChatRequest = { images?: string[]; messages: EngineMessage[]; maxTokens?: number; thoughtBudget?: number; /** instead of the family's sampling temperature */ temperature?: number }
 
 export interface Engine {
   load(modelPath: string, contextSize: number, minContext: number): Promise<{ contextSize: number }>

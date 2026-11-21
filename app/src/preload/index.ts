@@ -4,9 +4,24 @@ import { capabilities, platformOf } from '../shared/platform'
 import type { ChatView, ConversationSummary, ConversationView, NoteView, PromptAction, SetupState, UpdateStatus, WidgetView, YogurtApi } from '../shared/types'
 
 const api: YogurtApi = {
+  organizer: {
+    get: id => ipcRenderer.invoke('organizer:get', id),
+    configure: (id, options, context) => ipcRenderer.invoke('organizer:configure', id, options, context),
+    attach: id => ipcRenderer.invoke('organizer:attach', id),
+    attachBytes: (id, files) => ipcRenderer.invoke('organizer:attach-bytes', id, files),
+    pasteImage: id => ipcRenderer.invoke('organizer:paste-image', id),
+    remove: (id, evidenceId) => ipcRenderer.invoke('organizer:remove', id, evidenceId),
+    start: id => ipcRenderer.invoke('organizer:start', id),
+    answer: (id, answers, defaults) => ipcRenderer.invoke('organizer:answer', id, answers, defaults),
+    openWork: id => ipcRenderer.invoke('organizer:open-work', id),
+    mailSearch: (id, query) => ipcRenderer.invoke('organizer:mail-search', id, query),
+    onChange: cb => { const on = (_e: unknown, state: import('../shared/organizer').OrganizerState) => cb(state); ipcRenderer.on('organizer:changed', on); return () => { ipcRenderer.removeListener('organizer:changed', on) } },
+    gmail: {status: () => ipcRenderer.invoke('gmail:status'), importClient: () => ipcRenderer.invoke('gmail:import-client'), connect: () => ipcRenderer.invoke('gmail:connect'), disconnect: () => ipcRenderer.invoke('gmail:disconnect'), guide: () => ipcRenderer.invoke('gmail:guide')},
+  },
   subscription: {
     status: () => ipcRenderer.invoke('subscription:status'),
-    apply: (model) => ipcRenderer.invoke('subscription:apply', model),
+    apply: (model, effort) => ipcRenderer.invoke('subscription:apply', model, effort),
+    test: () => ipcRenderer.invoke('subscription:test'),
     removeLocal: () => ipcRenderer.invoke('subscription:remove-local'),
   },
   platform: process.platform,

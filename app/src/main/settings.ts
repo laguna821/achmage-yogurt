@@ -3,7 +3,7 @@ import { isLocale } from '../shared/i18n'
 import { spokenOf, type Spoken } from '../shared/spoken'
 
 /** theme: light or dark regardless of the system; follows the system when left out. language: the interface's, the computer's when left out */
-export type Settings = { aiModel?: import('../shared/subscription').SubscriptionModel; theme?: 'light' | 'dark'; language?: string; /** what the person is called in their meetings; their Mac's full name when left out */ myName?: string
+export type Settings = { aiModel?: import('../shared/subscription').SubscriptionModel; aiReasoningEffort?: import('../shared/subscription').ReasoningEffort; theme?: 'light' | 'dark'; language?: string; /** what the person is called in their meetings; their Mac's full name when left out */ myName?: string
   /** the first-run questions were shown (answered or put off): never asked again */
   welcomed?: boolean
   /** the intro screens were read or skipped (kept apart, so a restart halfway through goes on with the permissions) */

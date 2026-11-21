@@ -53,6 +53,9 @@ describe('official subscription client bridge', () => {
     expect(subscriptionArgs('claude-sonnet-5-5')).toContain('--safe-mode')
     expect(subscriptionArgs('gpt-6.2-sol')).toContain('gpt-6.2-sol')
     expect(subscriptionArgs('gpt-6.2-sol')).toContain('features.shell_tool=false')
+    expect(subscriptionArgs('gpt-6.2-sol')).toContain('model_reasoning_effort="xhigh"')
+    expect(subscriptionArgs('gpt-6.2-sol', 'high', ['/context.png'])).toContain('model_reasoning_effort="high"')
+    expect(subscriptionArgs('gpt-6.2-sol', 'xhigh', ['/context.png'])).toContain('/context.png')
     const previous = { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY, OPENAI_API_KEY: process.env.OPENAI_API_KEY, OPENAI_BASE_URL: process.env.OPENAI_BASE_URL }
     process.env.ANTHROPIC_API_KEY = 'test-only'; process.env.OPENAI_API_KEY = 'test-only'; process.env.OPENAI_BASE_URL = 'https://example.invalid'
     const env = subscriptionEnv()

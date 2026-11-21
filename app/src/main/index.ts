@@ -1,3 +1,4 @@
+import { createOrganizerHost } from './organizer/ipc'
 import { matchSearchPeople, searchPersonKey } from '../shared/searchPeople'
 import { resolvePeople } from './people'
 import { createFolderSuggestions } from './folderSuggestions'
@@ -60,7 +61,7 @@ import { setGenericTitles } from './titles'
 import { installAppMenu } from './appMenu'
 import { SubscriptionEngine } from './subscriptionEngine'
 import { hookSubscriptionSettings } from './subscriptionSettings'
-import { subscriptionModel } from '../shared/subscription'
+import { subscriptionModel, reasoningEffort } from '../shared/subscription'
 import { createNotesModel } from './notes/model'
 import { FakeEngine } from './notes/fake'
 import { hookNotes } from './notes'
@@ -573,7 +574,7 @@ app.whenReady().then(() => {
   // Subscription requests happen for an explicit summary/chat job, never for background read-ahead.
   const readsAhead = false
   // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
-  const engine = isFake() ? new FakeEngine() : new SubscriptionEngine(() => subscriptionModel(loadSettings(settingsFile).aiModel), join(userDataDir(), 'subscription-runtime'))
+  const engine = isFake() ? new FakeEngine() : new SubscriptionEngine(() => subscriptionModel(loadSettings(settingsFile).aiModel), join(userDataDir(), 'subscription-runtime'), () => reasoningEffort(loadSettings(settingsFile).aiReasoningEffort))
   if (!isFake()) hookSubscriptionSettings(userDataDir(), () => engine instanceof SubscriptionEngine && engine.busy)
   // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
   const smallMac = isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem())
@@ -597,7 +598,7 @@ app.whenReady().then(() => {
   // the meeting is read into the model as it happens, so its notes start within seconds of stopping
   const readAhead = hookReadAhead({
     store, queue, model, live: readsAhead, backlogMs: transcriptionBacklogMs, language: meetingLanguage,
-    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) }, onStart: onMeetingStart, onStop: onMeetingStop,
+    transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) }, onStart: isFake() ? onMeetingStart : () => {}, onStop: isFake() ? onMeetingStop : () => {},
   })
   const folderSuggestions = createFolderSuggestions({ store, queue, model, changed: () => win?.webContents.send('folders:changed') })
   let resumingId: string | null = null
@@ -608,7 +609,10 @@ app.whenReady().then(() => {
     removed: id => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('audio:deleted', id) },
     ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
+  const organizerHost = !isFake() ? createOrganizerHost(userDataDir(), join(process.resourcesPath, 'achmage-transcript'), (id): id is string => isId(id) && !!store.meeting(id), state => win?.webContents.send('organizer:changed', state)) : undefined
   const notes = hookNotes({
+    manual: !isFake(),
+    ...(organizerHost ? { organize: (id, input, llm, token, signal) => organizerHost.organizer.run(id, input, llm, token, store.meeting(id)!.startedAt, signal), organized: (id, md) => organizerHost.organizer.complete(id, md) } : {}),
     summarized: id => { folderSuggestions.schedule(id); void removeRecording(id, true) },
     // Windows and Linux: a note waiting while the model loads says so (a Mac shows what it always did)
     showLoading: platform !== 'darwin',
@@ -733,6 +737,14 @@ app.whenReady().then(() => {
   })
   // notes only for a meeting that exists: saving one for an unknown id would throw (its row must exist)
   const known = (id: unknown): id is string => isId(id) && !!store.meeting(id)
+  ipcMain.handle('organizer:start', (_e, id: unknown) => { if (!known(id)) throw new Error('기록을 찾지 못했습니다.'); organizerHost?.organizer.preserve(id, notes.view(id).enhanced); return notes.writeAgain(id) })
+  ipcMain.handle('organizer:answer', (_e, id: unknown, answers: unknown, defaults: unknown) => {
+    if (!known(id) || !organizerHost || !answers || typeof answers !== 'object' || Array.isArray(answers)) throw new Error('확인 답변을 확인하세요.')
+    const useDefaults = !!defaults || !Object.values(answers).some(a => typeof a === 'string' && a.trim() && a !== '__DEFAULT__')
+    organizerHost.organizer.answer(id, answers as Record<string,string>, useDefaults)
+    if (!useDefaults) organizerHost.organizer.preserve(id, notes.view(id).enhanced)
+    return useDefaults ? Promise.resolve() : notes.writeAgain(id)
+  })
   ipcMain.handle('notes:get', (_e, id: unknown) => (isId(id) ? notes.view(id) : undefined))
   const saveEdit = (id: unknown, side: unknown, md: unknown, revision: unknown): NoteSaveResult => {
     if (!isId(id) || typeof md !== 'string' || !Number.isSafeInteger(revision) || Number(revision) < 1 || (side !== 'mine' && side !== 'enhanced')) return { revision: Number(revision) || 0, status: 'failed', retained: false }

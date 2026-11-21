@@ -20,7 +20,7 @@ export type Llm = {
    * one answer; onToken gets the text as it is written. summary: a part of a long meeting, not shown.
    * before: an earlier prompt and its answer, in that order, that this one follows on from
    */
-  chat(prompt: string, onToken: (text: string) => void, o?: { summary?: boolean; maxTokens?: number; before?: string[]; /** colder sampling for an answer that must come out the same each time */ temperature?: number }): Promise<string>
+  chat(prompt: string, onToken: (text: string) => void, o?: { images?: string[]; summary?: boolean; maxTokens?: number; before?: string[]; /** colder sampling for an answer that must come out the same each time */ temperature?: number }): Promise<string>
   /** reads the start of a prompt into the model without answering, so a prompt that starts the same way later reads only the rest */
   readAhead?(text: string, signal?: AbortSignal): Promise<void>
 }
@@ -57,6 +57,7 @@ export function transcriptText(segments: Segment[]): string {
 }
 
 export type PromptInput = {
+  recordEvidence?: string; sessionKind?: import('../../shared/organizer').RecordKind; outputProfile?: import('../../shared/organizer').RecordProfile
   title: string; attendees: Person[]; mine: string; transcript: string; language: string
   summaryLanguage?: string
   /** the person who recorded it, so the invite's other person is known */
@@ -290,6 +291,7 @@ const nextStepsPrompt = (language: string) =>
   `Now write only the "## Next steps" section (heading in ${language || 'the same language'}): one bullet per thing someone will do after the meeting, as "- **Name:** what they will do, by when" (the when only if it was said), "You" for the person these notes are for, and plain words for who they are for someone without a name ("Them" is not a name). If nobody is to do anything, answer only NONE. Nothing else.`
 
 export type EnhanceInput = {
+  organize?: (input: PromptInput, llm: Llm, onToken: (s: string) => void) => Promise<string>
   meeting: { title: string; attendees: Person[] }; mine: string; segments: Segment[]; language: string | null
   /** a locale from Settings; a rewrite note may override it */
   summaryLanguage?: string
@@ -375,7 +377,7 @@ export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: str
       const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
       return `[${time}] [channel=${s.track}; label=${s.speaker || 'unknown'}] ${s.text}`
     }).join('\n')
-    const md = await writeTranscriptRecord({ ...base, transcript }, llm, onToken, onStage)
+    const md = input.organize ? await input.organize({ ...base, transcript }, llm, onToken) : await writeTranscriptRecord({ ...base, transcript }, llm, onToken, onStage)
     input.titleLater?.(model => model.chat(`${titlePrompt(summaryLanguage || language, input.me, input.meeting.attendees)}\nRecord (source data):\n${JSON.stringify(md)}`, () => {}, { maxTokens: 80, temperature: 0.1 })
       .then(raw => cleanTitle(raw, input.me), () => ''))
     return markMine(md, input.mine)
