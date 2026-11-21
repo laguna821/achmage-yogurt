@@ -1,4 +1,5 @@
 import type { Llm, PromptInput } from './enhance'
+import { OutputLimitError } from '../outputLimit'
 
 /** App adaptation of achmage-transcript 0.3.0, pinned in ACHMAGE-TRANSCRIPT.md.
  * The source skill stays untouched. This client has transcript/notes/attendee evidence,
@@ -58,6 +59,45 @@ export function cleanRecord(raw: string): string {
   return md
 }
 
+const CONTINUE = 'The previous answer stopped at its output limit. Continue the SAME document from the exact next character after the supplied assistant prefix. Do not restart, summarize, repeat headings or repeat completed text. If the prefix ends inside a word, sentence, table or Mermaid fence, finish that structure first. The original full-source task and all fidelity/format rules still apply. Output only the remaining document. If the entire requested record is already finished, output exactly [[RECORD_COMPLETE]].'
+
+function remainder(prefix: string, next: string): string {
+  if (next.trim() === '[[RECORD_COMPLETE]]') return ''
+  // Some clients repeat the exact boundary. Remove only a substantial literal overlap.
+  for (let n = Math.min(512, prefix.length, next.length); n >= 24; n--) if (prefix.endsWith(next.slice(0, n))) return next.slice(n)
+  return next
+}
+
+/** At most two continuations; every one keeps the full original task/source and exact prefix.
+ * Output remains unsaved until a normal completed response and structural validation.
+ */
+export async function completeRecordPass(prompt: string, llm: Llm, onToken: (text: string) => void): Promise<string> {
+  let prefix = ''
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const request = attempt ? CONTINUE : prompt
+    const before = attempt ? [prompt, prefix] : undefined
+    const sizes = await llm.count([...(before ?? []), request])
+    const available = llm.contextSize - sizes.reduce((n, x) => n + x, 0) - 1024
+    const maxTokens = Math.min(RECORD_TOKENS, available)
+    if (maxTokens < 4096) throw new Error('이어 쓸 문맥 공간이 부족합니다. 원문을 줄이지 않고 이전 요약을 보존했습니다.')
+    try {
+      // Continuations are buffered so repeated boundary text or the completion marker never flashes in the editor.
+      const answer = await llm.chat(request, attempt ? () => {} : onToken, { maxTokens, temperature: 0.1, before })
+      const more = remainder(prefix, answer)
+      if (attempt) onToken(more)
+      return prefix + more
+    } catch (e) {
+      if (!(e instanceof OutputLimitError)) throw e
+      if (attempt === 2) throw new Error('상세 정리가 이어 쓰기 한도를 넘었습니다. 완성되지 않은 문서 대신 이전 요약을 보존했습니다.')
+      const more = remainder(prefix, e.partial)
+      if (!more) throw new Error('이어 쓸 내용이 반복되었습니다. 이전 요약을 보존했습니다.')
+      if (attempt) onToken(more)
+      prefix += more
+    }
+  }
+  throw new Error('상세 정리를 완성하지 못했습니다. 이전 요약을 보존했습니다.')
+}
+
 /** Three bounded passes. Original evidence is provided again for the final independent review.
  * Over-context inputs are rejected instead of silently replacing them with lossy summaries.
  */
@@ -74,9 +114,9 @@ export async function writeTranscriptRecord(i: PromptInput, llm: Llm, onToken: (
   stage?.('drafting')
   const draftPrompt = recordDraftPrompt(i, evidence)
   await room(draftPrompt, RECORD_TOKENS)
-  const draft = cleanRecord(await llm.chat(draftPrompt, () => {}, { maxTokens: RECORD_TOKENS, temperature: 0.2 }))
+  const draft = cleanRecord(await completeRecordPass(draftPrompt, llm, () => {}))
   stage?.('checking')
   const reviewPrompt = recordReviewPrompt(i, draft)
   await room(reviewPrompt, RECORD_TOKENS)
-  return cleanRecord(await llm.chat(reviewPrompt, onToken, { maxTokens: RECORD_TOKENS, temperature: 0.1 }))
+  return cleanRecord(await completeRecordPass(reviewPrompt, llm, onToken))
 }

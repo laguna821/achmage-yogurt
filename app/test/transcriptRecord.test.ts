@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { cleanRecord, writeTranscriptRecord } from '../src/main/notes/transcriptRecord'
+import { cleanRecord, completeRecordPass, writeTranscriptRecord } from '../src/main/notes/transcriptRecord'
+import { OutputLimitError } from '../src/main/outputLimit'
 import { enhance, type Llm, type PromptInput } from '../src/main/notes/enhance'
 import type { Segment } from '../src/main/store'
 
@@ -9,6 +10,26 @@ const draft = '## 개요\n\n워크숍 운영을 검토했다.\n\n## 워크숍 �
 const final = draft + '\n\n## 동료 평가 사례\n\n마지막에 peer review 사례를 설명했다.'
 
 describe('Achmage transcript record', () => {
+  it('continues a cutoff from the exact prefix with the full original source and saves no partial', async () => {
+    const prefix = '## 개요\n\n날짜는 아직 ', tail = '정해지지 않았다.\n\n## 확인 사항\n\n숫자를 확인해야 한다.'
+    const streamed: string[] = []
+    let calls = 0
+    const llm: Llm = { contextSize: 131_072, count: async xs => xs.map(x => x.length), chat: async (p, token, options) => {
+      if (++calls === 1) { token(prefix); throw new OutputLimitError(prefix) }
+      expect(options?.before).toEqual(['ORIGINAL FULL SOURCE', prefix])
+      expect(p).toContain('exact next character')
+      token(tail); return tail
+    } }
+    expect(await completeRecordPass('ORIGINAL FULL SOURCE', llm, t => streamed.push(t))).toBe(prefix + tail)
+    expect(streamed.join('')).toBe(prefix + tail)
+    expect(calls).toBe(2)
+  })
+  it('bounds continuations instead of retrying an exhausted output indefinitely', async () => {
+    let calls = 0
+    const llm: Llm = { contextSize: 131_072, count: async xs => xs.map(x => x.length), chat: async () => { calls++; throw new OutputLimitError('다음 문단 '+calls) } }
+    await expect(completeRecordPass('SOURCE', llm, () => {})).rejects.toThrow('이어 쓰기 한도')
+    expect(calls).toBe(3)
+  })
   it('checks the original tail independently and only streams the checked pass', async () => {
     const calls: string[] = [], streamed: string[] = [], stages: string[] = []
     const llm: Llm = { contextSize: 131_072, count: async xs => xs.map(x => x.length), chat: async (p, token, opts) => {
