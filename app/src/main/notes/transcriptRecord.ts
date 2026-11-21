@@ -48,12 +48,13 @@ Return the ENTIRE corrected record in ${i.summaryLanguage || i.language || 'the 
 }
 
 /** Unlike the old bullet-only cleaner, never removes ending prose, tables or Mermaid. */
-export function cleanRecord(raw: string): string {
+export function cleanRecord(raw: string, overview?: string): string {
   let md = raw.replace(/\r\n?/g, '\n').trim()
   if (/^```(?:markdown|md)\s*\n/i.test(md) && /\n```\s*$/.test(md)) md = md.replace(/^```[^\n]*\n/, '').replace(/\n```\s*$/, '').trim()
   const start = md.search(/^## /m)
   if (start < 0) throw new Error('상세 정리의 문서 구조를 확인하지 못했습니다. 이전 요약을 보존했습니다.')
   md = md.slice(start).trim()
+  if (overview && md.split('\n')[0] !== `## ${overview}`) throw new Error('상세 정리의 시작 부분이 누락되었습니다. 이전 요약을 보존했습니다.')
   if ((md.match(/^```/gm) ?? []).length % 2) throw new Error('상세 정리의 도식이 끝나지 않았습니다. 이전 요약을 보존했습니다.')
   if (!/[\p{L}\p{N}]/u.test(md.replace(/^#+.*$/gm, ''))) throw new Error('상세 정리가 비어 있습니다. 이전 요약을 보존했습니다.')
   return md
@@ -114,9 +115,10 @@ export async function writeTranscriptRecord(i: PromptInput, llm: Llm, onToken: (
   stage?.('drafting')
   const draftPrompt = recordDraftPrompt(i, evidence)
   await room(draftPrompt, RECORD_TOKENS)
-  const draft = cleanRecord(await completeRecordPass(draftPrompt, llm, () => {}))
+  const language = i.summaryLanguage || i.language
+  const draft = cleanRecord(await completeRecordPass(draftPrompt, llm, () => {}), /^(Korean|ko|한국어)$/i.test(language) ? '개요' : undefined)
   stage?.('checking')
   const reviewPrompt = recordReviewPrompt(i, draft)
   await room(reviewPrompt, RECORD_TOKENS)
-  return cleanRecord(await completeRecordPass(reviewPrompt, llm, onToken))
+  return cleanRecord(await completeRecordPass(reviewPrompt, llm, onToken), draft.split('\n')[0].slice(3))
 }

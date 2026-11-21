@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runSubscription, subscriptionArgs, subscriptionEnv } from '../src/main/subscriptionEngine'
+import { runSubscription, subscriptionAnswer, subscriptionArgs, subscriptionEnv } from '../src/main/subscriptionEngine'
 
 const dirs: string[] = []
 const cwd = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-sub-test-')); dirs.push(d); return d }
@@ -11,6 +11,16 @@ const request = [{ role: 'user' as const, content: '시험 회의 전사' }]
 const fixture = (code: string) => ({ binary: process.execPath, args: ['-e', code] })
 
 describe('official subscription client bridge', () => {
+  it('preserves the complete stream when the CLI result is only its last text block', async () => {
+    const first = '## 개요\n\n본문이다.\n\n', last = '## 확인 사항\n\n날짜를 확인한다.'
+    const command = fixture(`process.stdin.resume();process.stdin.on('end',()=>{for(const text of ${JSON.stringify([first,last])})console.log(JSON.stringify({type:'stream_event',event:{type:'content_block_delta',delta:{type:'text_delta',text}}}));console.log(JSON.stringify({type:'result',result:${JSON.stringify(last)},is_error:false}));});`)
+    await expect(runSubscription('claude-sonnet-5-5', request, cwd(), () => {}, undefined, command)).resolves.toBe(first + last)
+    expect(() => subscriptionAnswer(first, '다른 응답')).toThrow('일치하지')
+  })
+  it('carries the whole exact stream in a cutoff even when the final field is only its tail', async () => {
+    const command = fixture(`process.stdin.resume();process.stdin.on('end',()=>{console.log(JSON.stringify({type:'stream_event',event:{type:'content_block_delta',delta:{type:'text_delta',text:'WHOLE DOCUMENT TAIL'}}}));console.log(JSON.stringify({type:'stream_event',event:{type:'message_delta',delta:{stop_reason:'max_tokens'}}}));console.log(JSON.stringify({type:'result',result:'TAIL',is_error:false}));});`)
+    await expect(runSubscription('claude-sonnet-5-5', request, cwd(), () => {}, undefined, command)).rejects.toMatchObject({partial:'WHOLE DOCUMENT TAIL'})
+  })
   it('passes an explicit long-record output budget to Claude', async () => {
     const command = fixture(`process.stdin.resume();process.stdin.on('end',()=>console.log(JSON.stringify({type:'result',result:process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS,is_error:false})));`)
     await expect(runSubscription('claude-sonnet-5-5', request, cwd(), () => {}, undefined, command, 16000)).resolves.toBe('16000')

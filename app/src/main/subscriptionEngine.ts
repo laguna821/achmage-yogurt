@@ -47,6 +47,19 @@ export function readSubscriptionEvent(e: any): { text?: string; final?: string; 
   return {}
 }
 
+/** The CLI result may contain only the last text block of a multi-block answer.
+ * Reconcile literal prefixes/suffixes; never replace a whole stream with its tail.
+ */
+export function subscriptionAnswer(streamed: string, final: string): string {
+  if (!final) return streamed
+  if (!streamed) return final
+  const a = streamed.trimEnd(), b = final.trimEnd()
+  if (a === b) return final
+  if (a.endsWith(b)) return streamed
+  if (b.startsWith(a) || b.endsWith(a)) return final
+  throw new Error('모델의 본문과 최종 응답이 일치하지 않습니다. 이전 요약을 보존했습니다.')
+}
+
 export function runSubscription(model: SubscriptionModel, messages: EngineMessage[], cwd: string, onToken: (s: string) => void, signal?: AbortSignal, command?: { binary: string; args: string[] }, maxTokens?: number): Promise<string> {
   if (signal?.aborted) return Promise.reject(new Error('Stopped'))
   mkdirSync(cwd, { recursive: true, mode: 0o700 })
@@ -81,10 +94,14 @@ export function runSubscription(model: SubscriptionModel, messages: EngineMessag
     child.on('close', (code) => {
       if (pending.trim()) line(pending)
       if (stopped) return finish(new Error('Stopped'))
-      if (limited && (final || streamed).trim()) return finish(new OutputLimitError(final || streamed))
+      console.info('NOTES', `subscription response: stream ${streamed.length} chars, result ${final.length} chars, cutoff ${limited}`)
+      let answer: string
+      try { answer = subscriptionAnswer(streamed, final) } catch (e) { return finish(e as Error) }
+      if (limited && answer.trim()) return finish(new OutputLimitError(answer))
       if (error || code !== 0) return finish(new Error(subscriptionError(model, error || stderr || `exit ${code}`)))
-      if (!(final || streamed).trim()) return finish(new Error('구독 모델이 빈 응답을 반환했습니다. 요약을 저장하지 않았습니다.'))
+      if (!answer.trim()) return finish(new Error('구독 모델이 빈 응답을 반환했습니다. 요약을 저장하지 않았습니다.'))
       if (!streamed && final) onToken(final)
+      final = answer
       finish()
     })
     child.stdin.on('error', () => {})

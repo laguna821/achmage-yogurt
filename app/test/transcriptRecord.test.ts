@@ -50,6 +50,7 @@ describe('Achmage transcript record', () => {
     expect(cleanRecord('설명합니다.\n' + md)).toBe(md)
     expect(cleanRecord('```markdown\n' + md + '\n```')).toBe(md)
     expect(() => cleanRecord(md + '\n```mermaid\nflowchart LR')).toThrow('도식이 끝나지')
+    expect(() => cleanRecord('## 확인 사항\n\n꼬리 부분만 남았다.', '개요')).toThrow('시작 부분이 누락')
   })
   it('rejects over-context source rather than silently summarizing or cutting it', async () => {
     let calls = 0
