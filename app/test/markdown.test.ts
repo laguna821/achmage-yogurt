@@ -6,6 +6,21 @@ const p = (text: string): PMNode => ({ type: 'paragraph', content: [{ type: 'tex
 const para = (text: string): PMNode => ({ type: 'doc', content: [p(text)] })
 const docRoundTrip = (doc: PMNode) => mdToDoc(docToMd(doc))
 
+describe('detailed record blocks', () => {
+  it('keeps editable tables and literal pipes through saving', () => {
+    const md = '## 후속 과제\n| 과제 | 담당 | 기한 |\n| --- | --- | --- |\n| A\\|B 비교 | **김 교수** | 미정 |\n\n마지막 문단이다.'
+    expect(roundTrip(md)).toBe(md)
+    const table = mdToDoc(md).content?.find(n => n.type === 'table')
+    expect(table?.content?.[1].content?.[0].content?.[0].content?.[0].text).toBe('A|B 비교')
+  })
+  it('keeps Mermaid source, comments, blank lines and ending prose after editing', () => {
+    const md = '## 절차\n```mermaid\nflowchart LR\n%% @caption: 검토와 보완\nA["검토"] --> B["보완"]\n\nB --> C["다시 확인"]\n```\n\n#### 확인 사항\n끝부분도 보존한다.'
+    expect(roundTrip(md)).toBe(md)
+    expect(mdToDoc(md).content?.find(n => n.type === 'mermaid')?.attrs?.complete).toBe(true)
+    expect(mdToDoc('```mermaid\nflowchart LR\nA', { streaming: true }).content?.[0].attrs?.complete).toBe(false)
+  })
+})
+
 describe('markdown', () => {
   it('turns <mine> lines into a marked span', () => {
     const doc = mdToDoc('- <mine>Ship on Tuesday</mine> after review')

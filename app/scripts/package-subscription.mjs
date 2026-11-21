@@ -17,7 +17,7 @@ rmSync(join(unpacked, 'out'), { recursive: true }); cpSync(built, join(unpacked,
 for (const p of ['node_modules/node-llama-cpp', 'node_modules/@node-llama-cpp']) rmSync(join(unpacked, p), { recursive: true, force: true })
 rmSync(join(output, 'resources/app.asar.unpacked'), { recursive: true, force: true })
 const pkgPath = join(unpacked, 'package.json'), pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
-pkg.version = '0.3.38-achmage.1'; delete pkg.dependencies['node-llama-cpp']
+pkg.version = '0.3.38-achmage.2'; delete pkg.dependencies['node-llama-cpp']
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
 await asar.createPackage(unpacked, join(output, 'resources/app.asar'))
 rmSync(unpacked, { recursive: true })

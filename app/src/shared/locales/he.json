@@ -139,8 +139,6 @@
   "English only": "אנגלית בלבד",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "אנגלית בלבד מהירה ומדויקת יותר. לפגישות בשפות אחרות, כדאי לבחור “רב־לשוני”.",
   "Everyone else": "כל השאר",
-  "Everything stays on your Mac.": "הכול נשאר ב־Mac שלך.",
-  "Everything stays on your computer.": "הכול נשאר במחשב שלך.",
   "Expand sidebar": "הרחבת סרגל הצד",
   "Exported {count} meetings": {
     "one": "יוצאה פגישה אחת",
@@ -690,5 +688,8 @@
   "Dock only": "Dock בלבד",
   "Summary language": "שפת הסיכום",
   "Same as the meeting": "כמו בפגישה",
-  "Used for new summaries and when you write them again.": "משמשת לסיכומים חדשים ולכתיבה מחדש שלהם."
+  "Used for new summaries and when you write them again.": "משמשת לסיכומים חדשים ולכתיבה מחדש שלהם.",
+  "Checking speakers, terms and topics…": "בדיקת דוברים, מונחים ונושאים…",
+  "Writing a detailed record…": "כתיבת רישום מפורט…",
+  "Checking the record against the transcript…": "השוואת הרישום לתמליל…"
 }

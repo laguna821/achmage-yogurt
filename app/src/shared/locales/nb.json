@@ -138,8 +138,6 @@
   "English only": "Bare engelsk",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Bare engelsk er raskere og mer nøyaktig. Velg Flerspråklig for møter på andre språk.",
   "Everyone else": "Alle andre",
-  "Everything stays on your Mac.": "Alt blir på Macen din.",
-  "Everything stays on your computer.": "Alt blir på datamaskinen din.",
   "Expand sidebar": "Vis sidepanelet",
   "Exported {count} meetings": {
     "one": "Eksporterte {count} møte",
@@ -680,5 +678,8 @@
   "Dock only": "Bare Dock",
   "Summary language": "Oppsummeringsspråk",
   "Same as the meeting": "Samme som møtet",
-  "Used for new summaries and when you write them again.": "Brukes til nye oppsummeringer og når du skriver dem på nytt."
+  "Used for new summaries and when you write them again.": "Brukes til nye oppsummeringer og når du skriver dem på nytt.",
+  "Checking speakers, terms and topics…": "Kontrollerer talere, begreper og emner…",
+  "Writing a detailed record…": "Skriver en detaljert oversikt…",
+  "Checking the record against the transcript…": "Kontrollerer oversikten mot transkripsjonen…"
 }

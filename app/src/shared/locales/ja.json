@@ -135,8 +135,6 @@
   "English only": "英語のみ",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "英語のみの方が速く、正確です。英語以外のミーティングには多言語を選んでください。",
   "Everyone else": "ほかの参加者",
-  "Everything stays on your Mac.": "すべてMacの中に残ります。",
-  "Everything stays on your computer.": "すべてコンピュータの中に残ります。",
   "Expand sidebar": "サイドバーを開く",
   "Exported {count} meetings": "{count}件のミーティングを書き出しました",
   "Exporting…": "書き出し中…",
@@ -638,5 +636,8 @@
   "Dock only": "Dockのみ",
   "Summary language": "要約の言語",
   "Same as the meeting": "会議と同じ",
-  "Used for new summaries and when you write them again.": "新しい要約と書き直す要約に使用します。"
+  "Used for new summaries and when you write them again.": "新しい要約と書き直す要約に使用します。",
+  "Checking speakers, terms and topics…": "話者・用語・トピックを確認中…",
+  "Writing a detailed record…": "詳細な記録を作成中…",
+  "Checking the record against the transcript…": "記録を文字起こしと照合中…"
 }

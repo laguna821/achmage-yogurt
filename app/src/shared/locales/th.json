@@ -135,8 +135,6 @@
   "English only": "อังกฤษเท่านั้น",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "อังกฤษเท่านั้นเร็วกว่าและแม่นยำกว่า เลือกหลายภาษาสำหรับการประชุมในภาษาอื่น",
   "Everyone else": "ทุกคนที่เหลือ",
-  "Everything stays on your Mac.": "ทุกอย่างอยู่บน Mac ของคุณ",
-  "Everything stays on your computer.": "ทุกอย่างอยู่บนคอมพิวเตอร์ของคุณ",
   "Expand sidebar": "ขยายแถบด้านข้าง",
   "Exported {count} meetings": "ส่งออก {count} การประชุมแล้ว",
   "Exporting…": "กำลังส่งออก…",
@@ -638,5 +636,8 @@
   "Dock only": "Dock เท่านั้น",
   "Summary language": "ภาษาสรุป",
   "Same as the meeting": "ภาษาเดียวกับการประชุม",
-  "Used for new summaries and when you write them again.": "ใช้สำหรับสรุปใหม่และเมื่อเขียนสรุปอีกครั้ง"
+  "Used for new summaries and when you write them again.": "ใช้สำหรับสรุปใหม่และเมื่อเขียนสรุปอีกครั้ง",
+  "Checking speakers, terms and topics…": "กำลังตรวจสอบผู้พูด คำศัพท์ และหัวข้อ…",
+  "Writing a detailed record…": "กำลังเขียนบันทึกโดยละเอียด…",
+  "Checking the record against the transcript…": "กำลังตรวจสอบบันทึกเทียบกับบทถอดเสียง…"
 }

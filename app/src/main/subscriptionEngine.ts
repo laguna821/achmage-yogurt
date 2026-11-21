@@ -38,6 +38,7 @@ export function subscriptionError(model: SubscriptionModel, detail: string): str
 
 /** Exported parser also exercises the actual CLI event formats in tests. */
 export function readSubscriptionEvent(e: any): { text?: string; final?: string; error?: string } {
+  if (e.stop_reason === 'max_tokens' || e.event?.delta?.stop_reason === 'max_tokens') return { error: '출력 한도로 정리가 중단되었습니다. 이전 요약을 보존했습니다.' }
   if (e.type === 'stream_event' && e.event?.type === 'content_block_delta' && e.event.delta?.type === 'text_delta') return { text: e.event.delta.text }
   if (e.type === 'result') return e.is_error ? { error: e.result || e.errors?.join(' ') || 'Claude request failed' } : { final: e.result }
   if (e.type === 'item.completed' && e.item?.type === 'agent_message') return { final: e.item.text }
@@ -45,11 +46,13 @@ export function readSubscriptionEvent(e: any): { text?: string; final?: string; 
   return {}
 }
 
-export function runSubscription(model: SubscriptionModel, messages: EngineMessage[], cwd: string, onToken: (s: string) => void, signal?: AbortSignal, command?: { binary: string; args: string[] }): Promise<string> {
+export function runSubscription(model: SubscriptionModel, messages: EngineMessage[], cwd: string, onToken: (s: string) => void, signal?: AbortSignal, command?: { binary: string; args: string[] }, maxTokens?: number): Promise<string> {
   if (signal?.aborted) return Promise.reject(new Error('Stopped'))
   mkdirSync(cwd, { recursive: true, mode: 0o700 })
   return new Promise((resolve, reject) => {
-    const child = spawn(command?.binary ?? subscriptionCli(model === 'claude-sonnet-5-5' ? 'claude' : 'codex'), command?.args ?? subscriptionArgs(model), { cwd, env: subscriptionEnv(), stdio: ['pipe', 'pipe', 'pipe'] })
+    const env = subscriptionEnv()
+    if (maxTokens && model === 'claude-sonnet-5-5') env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(Math.min(32_000, Math.max(256, maxTokens)))
+    const child = spawn(command?.binary ?? subscriptionCli(model === 'claude-sonnet-5-5' ? 'claude' : 'codex'), command?.args ?? subscriptionArgs(model), { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] })
     let pending = '', stderr = '', streamed = '', final = '', error = '', bytes = 0, stopped = false, finished = false
     const abort = () => { stopped = true; child.kill('SIGTERM') }
     const timer = setTimeout(() => { error = '요약 응답이 10분 안에 끝나지 않았습니다. 나중에 다시 시도하세요.'; child.kill('SIGTERM') }, 10 * 60_000)
@@ -121,7 +124,7 @@ export class SubscriptionEngine implements Engine {
     if (signal?.aborted) c.abort()
     const model = this.model()
     console.info('NOTES', `subscription ${model}, input ${req.messages.reduce((n, m) => n + m.content.length, 0)} characters`)
-    try { return await runSubscription(model, req.messages, this.cwd, onToken, c.signal) }
+    try { return await runSubscription(model, req.messages, this.cwd, onToken, c.signal, undefined, req.maxTokens) }
     finally { this.controllers.delete(c); signal?.removeEventListener('abort', stop) }
   }
 }

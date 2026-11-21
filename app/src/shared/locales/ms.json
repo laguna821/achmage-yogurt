@@ -135,8 +135,6 @@
   "English only": "Inggeris sahaja",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Inggeris sahaja lebih pantas dan tepat. Pilih Berbilang bahasa untuk mesyuarat dalam bahasa lain.",
   "Everyone else": "Semua orang lain",
-  "Everything stays on your Mac.": "Semuanya kekal di Mac anda.",
-  "Everything stays on your computer.": "Semuanya kekal di komputer anda.",
   "Expand sidebar": "Besarkan bar sisi",
   "Exported {count} meetings": "{count} mesyuarat dieksport",
   "Exporting…": "Mengeksport…",
@@ -638,5 +636,8 @@
   "Dock only": "Dock sahaja",
   "Summary language": "Bahasa ringkasan",
   "Same as the meeting": "Sama seperti mesyuarat",
-  "Used for new summaries and when you write them again.": "Digunakan untuk ringkasan baharu dan apabila ditulis semula."
+  "Used for new summaries and when you write them again.": "Digunakan untuk ringkasan baharu dan apabila ditulis semula.",
+  "Checking speakers, terms and topics…": "Menyemak penutur, istilah dan topik…",
+  "Writing a detailed record…": "Menulis catatan terperinci…",
+  "Checking the record against the transcript…": "Membandingkan catatan dengan transkrip…"
 }

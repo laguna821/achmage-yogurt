@@ -142,8 +142,6 @@
   "English only": "الإنجليزية فقط",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "الإنجليزية فقط أسرع وأدق. اختر متعدد اللغات للاجتماعات بلغات أخرى.",
   "Everyone else": "الجميع",
-  "Everything stays on your Mac.": "يبقى كل شيء على جهاز الـMac.",
-  "Everything stays on your computer.": "يبقى كل شيء على الكمبيوتر.",
   "Expand sidebar": "توسيع الشريط الجانبي",
   "Exported {count} meetings": {
     "zero": "لم يتم تصدير أي اجتماع",
@@ -736,5 +734,8 @@
   "Dock only": "Dock فقط",
   "Summary language": "لغة الملخص",
   "Same as the meeting": "نفس لغة الاجتماع",
-  "Used for new summaries and when you write them again.": "تُستخدم للملخصات الجديدة وعند إعادة كتابتها."
+  "Used for new summaries and when you write them again.": "تُستخدم للملخصات الجديدة وعند إعادة كتابتها.",
+  "Checking speakers, terms and topics…": "جارٍ التحقق من المتحدثين والمصطلحات والموضوعات…",
+  "Writing a detailed record…": "جارٍ كتابة سجل مفصّل…",
+  "Checking the record against the transcript…": "جارٍ مطابقة السجل مع النص المفرّغ…"
 }

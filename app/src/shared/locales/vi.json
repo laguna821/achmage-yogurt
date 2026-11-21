@@ -135,8 +135,6 @@
   "English only": "Chỉ tiếng Anh",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Chỉ tiếng Anh nhanh và chính xác hơn. Chọn Đa ngôn ngữ cho các cuộc họp bằng ngôn ngữ khác.",
   "Everyone else": "Mọi người khác",
-  "Everything stays on your Mac.": "Mọi thứ đều ở trên máy Mac của bạn.",
-  "Everything stays on your computer.": "Mọi thứ đều ở trên máy tính của bạn.",
   "Expand sidebar": "Mở rộng thanh bên",
   "Exported {count} meetings": "Đã xuất {count} cuộc họp",
   "Exporting…": "Đang xuất…",
@@ -638,5 +636,8 @@
   "Dock only": "Chỉ Dock",
   "Summary language": "Ngôn ngữ tóm tắt",
   "Same as the meeting": "Giống cuộc họp",
-  "Used for new summaries and when you write them again.": "Dùng cho bản tóm tắt mới và khi bạn viết lại."
+  "Used for new summaries and when you write them again.": "Dùng cho bản tóm tắt mới và khi bạn viết lại.",
+  "Checking speakers, terms and topics…": "Đang kiểm tra người nói, thuật ngữ và chủ đề…",
+  "Writing a detailed record…": "Đang viết bản ghi chi tiết…",
+  "Checking the record against the transcript…": "Đang đối chiếu bản ghi với bản chép lời…"
 }

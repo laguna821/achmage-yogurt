@@ -139,8 +139,6 @@
   "English only": "Solo inglese",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Solo inglese è più veloce e preciso. Scegli Multilingue per le riunioni in altre lingue.",
   "Everyone else": "Tutti gli altri",
-  "Everything stays on your Mac.": "Tutto resta sul tuo Mac.",
-  "Everything stays on your computer.": "Tutto resta sul tuo computer.",
   "Expand sidebar": "Espandi barra laterale",
   "Exported {count} meetings": {
     "one": "{count} riunione esportata",
@@ -699,5 +697,8 @@
   "Dock only": "Solo Dock",
   "Summary language": "Lingua dei riepiloghi",
   "Same as the meeting": "Quella della riunione",
-  "Used for new summaries and when you write them again.": "Usata per i nuovi riepiloghi e quando li riscrivi."
+  "Used for new summaries and when you write them again.": "Usata per i nuovi riepiloghi e quando li riscrivi.",
+  "Checking speakers, terms and topics…": "Verifica di interlocutori, termini e argomenti…",
+  "Writing a detailed record…": "Stesura di un resoconto dettagliato…",
+  "Checking the record against the transcript…": "Verifica del resoconto con la trascrizione…"
 }

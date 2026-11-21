@@ -139,8 +139,6 @@
   "English only": "Doar engleză",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Doar engleza e mai rapidă și mai precisă. Alegeți Multilingv pentru întâlniri în alte limbi.",
   "Everyone else": "Toți ceilalți",
-  "Everything stays on your Mac.": "Totul rămâne pe Mac-ul dvs.",
-  "Everything stays on your computer.": "Totul rămâne pe computerul dvs.",
   "Expand sidebar": "Extindeți bara laterală",
   "Exported {count} meetings": {
     "one": "A fost exportată {count} întâlnire",
@@ -697,5 +695,8 @@
   "Dock only": "Doar Dock",
   "Summary language": "Limba rezumatului",
   "Same as the meeting": "Aceeași ca în întâlnire",
-  "Used for new summaries and when you write them again.": "Folosită pentru rezumate noi și când le rescrii."
+  "Used for new summaries and when you write them again.": "Folosită pentru rezumate noi și când le rescrii.",
+  "Checking speakers, terms and topics…": "Se verifică vorbitorii, termenii și subiectele…",
+  "Writing a detailed record…": "Se redactează o înregistrare detaliată…",
+  "Checking the record against the transcript…": "Se verifică înregistrarea față de transcriere…"
 }

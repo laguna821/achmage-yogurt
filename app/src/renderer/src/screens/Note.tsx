@@ -518,7 +518,7 @@ function Enhanced({ notes, presentation, disabled, onChange, onBlur, onRetry, fo
       <NotesModelWait downloading={(percent) => (
         <p data-testid="note-enhanced-model-download" role="status" className="text-[15px] text-muted">{t("Your summary is waiting for Yogurt's AI to download.")} {percent && <span className="whitespace-nowrap">{percent}</span>}</p>
       )}>
-        <SummaryWaiting part={status === 'writing' ? notes.part : undefined} />
+        <SummaryWaiting step={notes.step} part={status === 'writing' ? notes.part : undefined} />
       </NotesModelWait>
     )
   }
@@ -528,7 +528,7 @@ function Enhanced({ notes, presentation, disabled, onChange, onBlur, onRetry, fo
         <span>{t("Yogurt couldn't regenerate the summary, so your previous version is still shown.")}</span>
         <button onClick={onRetry} className="inline-error-action">{t('Try again')}</button>
       </InlineError>}
-      {(rewriting || handoff) && <SummaryWaiting outline={false} writing={handoff} part={status === 'writing' ? notes.part : undefined} />}
+      {(rewriting || handoff) && <SummaryWaiting outline={false} writing={handoff} step={notes.step} part={status === 'writing' ? notes.part : undefined} />}
       <div ref={surface} className="summary-rewrite" data-rewriting={rewriting} data-handoff={handoff} style={handoff ? { minHeight: height.current } : undefined}>
         <div className="summary-result">
           <Editor focus={focus} testId="note-enhanced-editor" label={t('Summary')} className="enhanced" markdown={writing ? draft : notes.enhanced ?? ''} streaming={writing} editable={!writing && !rewriting && !disabled} onChange={onChange} onBlur={onBlur} />

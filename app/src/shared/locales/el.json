@@ -138,8 +138,6 @@
   "English only": "Μόνο αγγλικά",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Τα μόνο αγγλικά είναι πιο γρήγορα και πιο ακριβή. Επιλέξτε Πολύγλωσσο για συσκέψεις σε άλλες γλώσσες.",
   "Everyone else": "Όλοι οι άλλοι",
-  "Everything stays on your Mac.": "Όλα μένουν στο Mac σας.",
-  "Everything stays on your computer.": "Όλα μένουν στον υπολογιστή σας.",
   "Expand sidebar": "Ανάπτυξη πλαϊνής στήλης",
   "Exported {count} meetings": {
     "one": "Εξήχθη {count} σύσκεψη",
@@ -683,5 +681,8 @@
   "Dock only": "Μόνο Dock",
   "Summary language": "Γλώσσα σύνοψης",
   "Same as the meeting": "Ίδια με τη συνάντηση",
-  "Used for new summaries and when you write them again.": "Χρησιμοποιείται για νέες συνόψεις και όταν τις ξαναγράφετε."
+  "Used for new summaries and when you write them again.": "Χρησιμοποιείται για νέες συνόψεις και όταν τις ξαναγράφετε.",
+  "Checking speakers, terms and topics…": "Έλεγχος ομιλητών, όρων και θεμάτων…",
+  "Writing a detailed record…": "Σύνταξη αναλυτικής καταγραφής…",
+  "Checking the record against the transcript…": "Έλεγχος της καταγραφής με την απομαγνητοφώνηση…"
 }

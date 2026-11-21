@@ -138,8 +138,6 @@
   "English only": "English lang",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Mas mabilis at mas tumpak ang English lang. Piliin ang Maraming wika para sa mga meeting sa ibang wika.",
   "Everyone else": "Lahat ng iba",
-  "Everything stays on your Mac.": "Lahat ay nananatili sa Mac mo.",
-  "Everything stays on your computer.": "Lahat ay nananatili sa computer mo.",
   "Expand sidebar": "I-expand ang sidebar",
   "Exported {count} meetings": {
     "one": "Na-export ang {count} meeting",
@@ -680,5 +678,8 @@
   "Dock only": "Dock lang",
   "Summary language": "Wika ng buod",
   "Same as the meeting": "Tulad ng sa pulong",
-  "Used for new summaries and when you write them again.": "Gagamitin sa mga bagong buod at kapag isinulat muli ang mga ito."
+  "Used for new summaries and when you write them again.": "Gagamitin sa mga bagong buod at kapag isinulat muli ang mga ito.",
+  "Checking speakers, terms and topics…": "Sinusuri ang mga nagsalita, termino at paksa…",
+  "Writing a detailed record…": "Gumagawa ng detalyadong tala…",
+  "Checking the record against the transcript…": "Inihahambing ang tala sa transcript…"
 }

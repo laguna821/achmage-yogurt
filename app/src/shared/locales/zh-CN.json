@@ -135,8 +135,6 @@
   "English only": "仅英语",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "仅英语更快、更准确。其他语言的会议请选择多语言。",
   "Everyone else": "其他所有人",
-  "Everything stays on your Mac.": "所有内容都留在你的 Mac 上。",
-  "Everything stays on your computer.": "所有内容都留在你的电脑上。",
   "Expand sidebar": "展开侧边栏",
   "Exported {count} meetings": "已导出 {count} 个会议",
   "Exporting…": "正在导出…",
@@ -638,5 +636,8 @@
   "Dock only": "仅 Dock",
   "Summary language": "摘要语言",
   "Same as the meeting": "与会议相同",
-  "Used for new summaries and when you write them again.": "用于新摘要和重新生成的摘要。"
+  "Used for new summaries and when you write them again.": "用于新摘要和重新生成的摘要。",
+  "Checking speakers, terms and topics…": "正在核对说话人、术语和主题…",
+  "Writing a detailed record…": "正在撰写详细记录…",
+  "Checking the record against the transcript…": "正在对照转写文本检查记录…"
 }

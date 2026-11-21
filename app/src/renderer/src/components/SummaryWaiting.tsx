@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { t } from '../../../shared/i18n'
 import type { NoteView } from '../../../shared/types'
 
-export function SummaryWaiting({ part, outline = true, writing = false }: { part?: NoteView['part']; outline?: boolean; writing?: boolean }) {
+export function SummaryWaiting({ part, step, outline = true, writing = false }: { part?: NoteView['part']; step?: NoteView['step']; outline?: boolean; writing?: boolean }) {
   const anchor = useRef<HTMLSpanElement>(null)
   const [frame, setFrame] = useState<Element | null>(null)
   useLayoutEffect(() => {
@@ -18,7 +18,7 @@ export function SummaryWaiting({ part, outline = true, writing = false }: { part
         </div>)}
       </div>)}
     </div>}
-    <span className="note-summary-status"><span className="summary-status-text">{writing ? t('Generating notes…') : part ? t('Reading a long meeting, part {part} of {of}…', { part: part.part, of: part.of }) : t('Reading the transcript…')}</span></span>
+    <span className="note-summary-status"><span className="summary-status-text">{writing ? t('Generating notes…') : step === 'analyzing' ? t('Checking speakers, terms and topics…') : step === 'drafting' ? t('Writing a detailed record…') : step === 'checking' ? t('Checking the record against the transcript…') : part ? t('Reading a long meeting, part {part} of {of}…', { part: part.part, of: part.of }) : t('Reading the transcript…')}</span></span>
   </div>
   // The scroller masks its descendants; the rewrite label belongs in the frame's reserved lane.
   return outline ? content : <><span ref={anchor} hidden />{frame ? createPortal(content, frame) : content}</>

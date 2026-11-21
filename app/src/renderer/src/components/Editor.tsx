@@ -8,6 +8,7 @@ import { citationTargetIndex } from '../../../shared/citations'
 import { EditorToolbar } from './EditorToolbar'
 import { inkKey, StreamingInk } from '../streamingInk'
 import { useReducedMotion } from '../motion'
+import { RecordTable, RecordRow, RecordCell, RecordHeader, RecordDiagram } from './RecordBlocks'
 
 /** The person's own words inside the enhanced notes: shown darker. Typing next to them is not theirs-marked. */
 const Mine = Mark.create({
@@ -45,7 +46,7 @@ export function Editor(p: {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
+        heading: { levels: [1, 2, 3, 4] },
         code: false, codeBlock: false, blockquote: false, horizontalRule: false, strike: false, underline: false,
         // an empty paragraph added after a final list would read as an edit (a blank line in the Markdown)
         trailingNode: false,
@@ -53,6 +54,7 @@ export function Editor(p: {
       }),
       Placeholder.configure({ placeholder: p.placeholder ?? '' }),
       Mine,
+      RecordTable, RecordRow, RecordCell, RecordHeader, RecordDiagram,
       StreamingInk,
     ],
     content: mdToDoc(p.markdown, { streaming: p.streaming }),
@@ -88,7 +90,7 @@ export function Editor(p: {
     let highlight: Highlight | undefined, timer = 0
     const frame = requestAnimationFrame(() => {
       if (editor.isDestroyed) return
-      const blocks = Array.from(editor.view.dom.querySelectorAll<HTMLElement>('p,h1,h2,h3'))
+      const blocks = Array.from(editor.view.dom.querySelectorAll<HTMLElement>('p,h1,h2,h3,h4'))
       const target = blocks[citationTargetIndex(blocks.map(block => block.textContent ?? ''), p.focus!.match!)]
       if (!target) return
       target.scrollIntoView({ block: 'center' })

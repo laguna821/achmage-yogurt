@@ -140,8 +140,6 @@
   "English only": "Tylko angielski",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Tylko angielski działa szybciej i dokładniej. Wybierz Wiele języków dla spotkań w innych językach.",
   "Everyone else": "Wszyscy pozostali",
-  "Everything stays on your Mac.": "Wszystko zostaje na Twoim Macu.",
-  "Everything stays on your computer.": "Wszystko zostaje na Twoim komputerze.",
   "Expand sidebar": "Rozwiń pasek boczny",
   "Exported {count} meetings": {
     "one": "Wyeksportowano {count} spotkanie",
@@ -716,5 +714,8 @@
   "Dock only": "Tylko Dock",
   "Summary language": "Język podsumowań",
   "Same as the meeting": "Taki jak na spotkaniu",
-  "Used for new summaries and when you write them again.": "Używany w nowych i ponownie tworzonych podsumowaniach."
+  "Used for new summaries and when you write them again.": "Używany w nowych i ponownie tworzonych podsumowaniach.",
+  "Checking speakers, terms and topics…": "Sprawdzanie mówców, terminów i tematów…",
+  "Writing a detailed record…": "Tworzenie szczegółowego zapisu…",
+  "Checking the record against the transcript…": "Porównywanie zapisu z transkrypcją…"
 }

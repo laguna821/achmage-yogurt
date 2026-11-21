@@ -138,8 +138,6 @@
   "English only": "Alleen Engels",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Alleen Engels is sneller en nauwkeuriger. Kies Meertalig voor meetings in andere talen.",
   "Everyone else": "Alle anderen",
-  "Everything stays on your Mac.": "Alles blijft op je Mac.",
-  "Everything stays on your computer.": "Alles blijft op je computer.",
   "Expand sidebar": "Navigatiekolom tonen",
   "Exported {count} meetings": {
     "one": "{count} meeting geëxporteerd",
@@ -680,5 +678,8 @@
   "Dock only": "Alleen Dock",
   "Summary language": "Taal van samenvattingen",
   "Same as the meeting": "Dezelfde als de vergadering",
-  "Used for new summaries and when you write them again.": "Voor nieuwe samenvattingen en wanneer je ze opnieuw schrijft."
+  "Used for new summaries and when you write them again.": "Voor nieuwe samenvattingen en wanneer je ze opnieuw schrijft.",
+  "Checking speakers, terms and topics…": "Sprekers, termen en onderwerpen controleren…",
+  "Writing a detailed record…": "Een uitgebreid verslag schrijven…",
+  "Checking the record against the transcript…": "Het verslag vergelijken met het transcript…"
 }

@@ -577,7 +577,7 @@ app.whenReady().then(() => {
   if (!isFake()) hookSubscriptionSettings(userDataDir(), () => engine instanceof SubscriptionEngine && engine.busy)
   // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
   const smallMac = isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem())
-  const model = createNotesModel({ engine, modelPath: () => isFake() ? setup.notesPath() : setup.notesPath() ? `subscription:${subscriptionModel(loadSettings(settingsFile).aiModel)}` : undefined, onLoaded: path => setup.notesModelLoaded(path) })
+  const model = createNotesModel({ engine, recordMode: !isFake(), modelPath: () => isFake() ? setup.notesPath() : setup.notesPath() ? `subscription:${subscriptionModel(loadSettings(settingsFile).aiModel)}` : undefined, onLoaded: path => setup.notesModelLoaded(path) })
   // first run: the notes model lands after recording already works; jobs wait in the queue for it
   // the embedding model (meaning search across meetings) runs in the same worker and is let go with the notes model
   const embedder = createEmbedder({ engine, modelPath: () => setup.installed()?.embed, id: bundledCatalog.embedding.id, dims: bundledCatalog.embedding.dims })

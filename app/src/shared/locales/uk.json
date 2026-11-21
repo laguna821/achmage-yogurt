@@ -140,8 +140,6 @@
   "English only": "Лише англійська",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Лише англійська працює швидше й точніше. Для зустрічей іншими мовами виберіть «Кілька мов».",
   "Everyone else": "Усі інші",
-  "Everything stays on your Mac.": "Усе лишається на вашому Mac.",
-  "Everything stays on your computer.": "Усе лишається на вашому комп’ютері.",
   "Expand sidebar": "Розгорнути бічну панель",
   "Exported {count} meetings": {
     "one": "Експортовано {count} зустріч",
@@ -708,5 +706,8 @@
   "Dock only": "Лише Dock",
   "Summary language": "Мова підсумку",
   "Same as the meeting": "Як на зустрічі",
-  "Used for new summaries and when you write them again.": "Використовується для нових і повторно створених підсумків."
+  "Used for new summaries and when you write them again.": "Використовується для нових і повторно створених підсумків.",
+  "Checking speakers, terms and topics…": "Перевірка учасників, термінів і тем…",
+  "Writing a detailed record…": "Підготовка докладного запису…",
+  "Checking the record against the transcript…": "Зіставлення запису з розшифровкою…"
 }

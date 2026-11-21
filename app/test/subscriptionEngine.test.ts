@@ -11,6 +11,14 @@ const request = [{ role: 'user' as const, content: '시험 회의 전사' }]
 const fixture = (code: string) => ({ binary: process.execPath, args: ['-e', code] })
 
 describe('official subscription client bridge', () => {
+  it('passes an explicit long-record output budget to Claude', async () => {
+    const command = fixture(`process.stdin.resume();process.stdin.on('end',()=>console.log(JSON.stringify({type:'result',result:process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS,is_error:false})));`)
+    await expect(runSubscription('claude-sonnet-5-5', request, cwd(), () => {}, undefined, command, 16000)).resolves.toBe('16000')
+  })
+  it('rejects a token-limited result even if the client subsequently reports success', async () => {
+    const command = fixture(`process.stdin.resume();process.stdin.on('end',()=>{console.log(JSON.stringify({type:'stream_event',event:{type:'message_delta',delta:{stop_reason:'max_tokens'}}}));console.log(JSON.stringify({type:'result',result:'truncated',is_error:false}));});`)
+    await expect(runSubscription('claude-sonnet-5-5', request, cwd(), () => {}, undefined, command)).rejects.toThrow('출력 한도')
+  })
   it('streams Claude text deltas and returns the authoritative completed response', async () => {
     const got: string[] = []
     const command = fixture(`process.stdin.resume();process.stdin.on('end',()=>{for(const text of ['회의 ','요약'])console.log(JSON.stringify({type:'stream_event',event:{type:'content_block_delta',delta:{type:'text_delta',text}}}));console.log(JSON.stringify({type:'result',result:'회의 요약',is_error:false}));});`)

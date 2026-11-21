@@ -8,13 +8,13 @@ export type PMNode = { type: string; attrs?: Record<string, unknown>; content?: 
 
 type Opts = { streaming?: boolean; inlineCode?: boolean }
 
-const HEADING = /^(#{1,3})\s+(.*)$/
+const HEADING = /^(#{1,4})\s+(.*)$/
 const ITEM = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/
 
 // ---------- inline ----------
 
 /** characters a backslash makes literal (docToMd escapes what the person typed with these) */
-const ESCAPABLE = '\\*_[]<#-+.)'
+const ESCAPABLE = '\\*_[]<#-+.)|'
 /** where `d` next appears from `from`, skipping escaped copies */
 function findClose(text: string, d: string, from: number): number {
   for (let i = text.indexOf(d, from); i !== -1; i = text.indexOf(d, i + 1)) {
@@ -136,8 +136,34 @@ export function mdToDoc(md: string, o: Opts = {}): PMNode {
   const content: PMNode[] = []
   // open lists, outermost first: the indent their items start at, and the list node
   let stack: Array<{ indent: number; list: PMNode }> = []
-  for (const raw of md.replace(/\r\n?/g, '\n').split('\n')) {
+  const lines = md.replace(/\r\n?/g, '\n').split('\n')
+  for (let at = 0; at < lines.length; at++) {
+    const raw = lines[at]
     const line = raw.replace(/\s+$/, '')
+    if (/^```mermaid\s*$/i.test(line)) {
+      stack = []
+      const code: string[] = []
+      while (at + 1 < lines.length && !/^```\s*$/.test(lines[at + 1])) code.push(lines[++at])
+      const complete = at + 1 < lines.length
+      if (complete) at++
+      content.push({ type: 'mermaid', attrs: { source: code.join('\n'), complete } })
+      continue
+    }
+    const cells = tableCells(line)
+    const separator = tableCells(lines[at + 1] ?? '')
+    if (cells && cells.length > 1 && separator?.length === cells.length && separator.every(c => /^:?-{3,}:?$/.test(c))) {
+      stack = []
+      const rows: PMNode[] = [{ type: 'tableRow', content: cells.map(c => ({ type: 'tableHeader', content: [para(c, o)] })) }]
+      at++
+      while (at + 1 < lines.length) {
+        const row = tableCells(lines[at + 1])
+        if (!row || row.length !== cells.length) break
+        rows.push({ type: 'tableRow', content: row.map(c => ({ type: 'tableCell', content: [para(c, o)] })) })
+        at++
+      }
+      content.push({ type: 'table', content: rows })
+      continue
+    }
     // a blank line is an empty paragraph: what the person typed comes back as it was
     if (!line.trim()) { stack = []; content.push({ type: 'paragraph' }); continue }
     const item = ITEM.exec(line)
@@ -171,7 +197,22 @@ export function mdToDoc(md: string, o: Opts = {}): PMNode {
   return { type: 'doc', content: content.length ? content : [{ type: 'paragraph' }] }
 }
 
-const hasText = (n: PMNode): boolean => !!n.text?.trim() || !!n.content?.some(hasText)
+/** GFM rows with escaped literal pipes; never treat ordinary prose as a table. */
+function tableCells(line: string): string[] | undefined {
+  const s = line.trim()
+  if (!s.startsWith('|') || !s.endsWith('|')) return undefined
+  const cells: string[] = []
+  let cell = '', slashes = 0
+  for (const c of s.slice(1, -1)) {
+    if (c === '|' && slashes % 2 === 0) { cells.push(cell.trim()); cell = '' }
+    else cell += c
+    slashes = c === '\\' ? slashes + 1 : 0
+  }
+  cells.push(cell.trim())
+  return cells
+}
+
+const hasText = (n: PMNode): boolean => !!n.text?.trim() || (n.type === 'mermaid' && !!String(n.attrs?.source ?? '').trim()) || !!n.content?.some(hasText)
 /** while streaming, a block at the end with no text yet (a bullet whose bold has only just opened) waits for its text, so the dot doesn't drop to it and back */
 function withoutEmptyEnd(nodes: PMNode[]) {
   while (nodes.length && !hasText(nodes.at(-1)!)) nodes.pop()
@@ -243,6 +284,14 @@ export function docToMd(doc: PMNode): string {
     if (b.type === 'heading') lines.push(`${'#'.repeat(Number(b.attrs?.level ?? 2))} ${inlineMd(b.content)}`)
     else if (b.type === 'bulletList' || b.type === 'orderedList') listMd(b, '', lines)
     else if (b.type === 'paragraph') lines.push(escapeStart(inlineMd(b.content)))
+    else if (b.type === 'mermaid') lines.push('```mermaid', String(b.attrs?.source ?? ''), '```')
+    else if (b.type === 'table') {
+      for (const [index, row] of (b.content ?? []).entries()) {
+        const cells = (row.content ?? []).map(cell => (cell.content ?? []).map(p => inlineMd(p.content)).join(' ').replace(/\|/g, '\\|'))
+        lines.push('| ' + cells.join(' | ') + ' |')
+        if (index === 0) lines.push('| ' + cells.map(() => '---').join(' | ') + ' |')
+      }
+    }
   }
   return lines.join('\n')
 }

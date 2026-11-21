@@ -1,6 +1,7 @@
 import type { Person, Segment } from '../store'
 import { LOCALES } from '../../shared/i18n'
 import { respell, spellingLine, type MeetingWords } from '../vocab'
+import { writeTranscriptRecord, type RecordStage } from './transcriptRecord'
 
 /**
  * Enhanced notes: the person's own notes plus the transcript, written up by the notes model as Markdown.
@@ -9,6 +10,8 @@ import { respell, spellingLine, type MeetingWords } from '../vocab'
  */
 
 export type Llm = {
+  /** The subscription edition writes and independently checks a full transcript record. */
+  recordMode?: boolean
   /** tokens the loaded model can read at once */
   contextSize: number
   /** tokens in each text, by the loaded model's own tokenizer */
@@ -53,7 +56,7 @@ export function transcriptText(segments: Segment[]): string {
   return turns.map((t) => `${t.who}: ${t.text}`).join('\n')
 }
 
-type PromptInput = {
+export type PromptInput = {
   title: string; attendees: Person[]; mine: string; transcript: string; language: string
   summaryLanguage?: string
   /** the person who recorded it, so the invite's other person is known */
@@ -358,13 +361,25 @@ function oneMic(segments: Segment[]): boolean {
  * summarised first and the notes are written from the summaries (in order) plus the person's own notes.
  * earlier: parts summarised while the meeting was recorded; those still matching the transcript are used as they are.
  */
-export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: string) => void, onPart?: (part: number, of: number) => void, earlier: PartSummary[] = []): Promise<string> {
+export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: string) => void, onPart?: (part: number, of: number) => void, earlier: PartSummary[] = [], onStage?: (stage: RecordStage) => void): Promise<string> {
   const language = languageName(input.language)
   const summaryLanguage = LOCALES.find((l) => l.id === input.summaryLanguage)?.english
   let first = Infinity, last = -Infinity
   for (const s of input.segments) { first = Math.min(first, s.startMs); last = Math.max(last, s.endMs) }
   const minutes = input.segments.length ? (last - first) / 60_000 : undefined
   const base = { title: input.meeting.title, attendees: input.meeting.attendees, mine: input.mine, language, summaryLanguage, minutes, me: input.me, spelling: input.words && spellingLine(input.words), oneMic: oneMic(input.segments) }
+  if (llm.recordMode) {
+    // Keep each original turn and its channel/time evidence. Do not pre-correct names by fuzzy matching.
+    const transcript = input.segments.map(s => {
+      const seconds = Math.floor(s.startMs / 1000)
+      const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+      return `[${time}] [channel=${s.track}; label=${s.speaker || 'unknown'}] ${s.text}`
+    }).join('\n')
+    const md = await writeTranscriptRecord({ ...base, transcript }, llm, onToken, onStage)
+    input.titleLater?.(model => model.chat(`${titlePrompt(summaryLanguage || language, input.me, input.meeting.attendees)}\nRecord (source data):\n${JSON.stringify(md)}`, () => {}, { maxTokens: 80, temperature: 0.1 })
+      .then(raw => cleanTitle(raw, input.me), () => ''))
+    return markMine(md, input.mine)
+  }
   const segments = input.words ? input.segments.map((x) => ({ ...x, text: respell(x.text, input.words!) })) : input.segments
   let transcript = transcriptText(segments)
   let parts = false

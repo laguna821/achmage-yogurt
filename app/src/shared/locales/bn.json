@@ -138,8 +138,6 @@
   "English only": "শুধু ইংরেজি",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "শুধু ইংরেজি দ্রুত ও বেশি নির্ভুল। অন্য ভাষার মিটিংয়ের জন্য বহু ভাষা বেছে নিন।",
   "Everyone else": "বাকি সবাই",
-  "Everything stays on your Mac.": "সবকিছু আপনার Mac-এই থাকে।",
-  "Everything stays on your computer.": "সবকিছু আপনার কম্পিউটারেই থাকে।",
   "Expand sidebar": "সাইডবার বড় করুন",
   "Exported {count} meetings": {
     "one": "{count}টি মিটিং এক্সপোর্ট হয়েছে",
@@ -668,5 +666,8 @@
   "Dock only": "শুধু Dock",
   "Summary language": "সারাংশের ভাষা",
   "Same as the meeting": "মিটিংয়ের ভাষা",
-  "Used for new summaries and when you write them again.": "নতুন সারাংশ ও সারাংশ আবার লেখার সময় ব্যবহৃত হয়।"
+  "Used for new summaries and when you write them again.": "নতুন সারাংশ ও সারাংশ আবার লেখার সময় ব্যবহৃত হয়।",
+  "Checking speakers, terms and topics…": "বক্তা, পরিভাষা ও বিষয় যাচাই করা হচ্ছে…",
+  "Writing a detailed record…": "বিস্তারিত বিবরণ লেখা হচ্ছে…",
+  "Checking the record against the transcript…": "প্রতিলিপির সঙ্গে বিবরণ মিলিয়ে দেখা হচ্ছে…"
 }

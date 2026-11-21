@@ -294,6 +294,18 @@ html.widget { --pill:#232326;--pill-ink:#F7F7FA;--accent:#B780FF;--pill-accent:v
 .note-prose.enhanced { color: var(--written); }
 .note-prose.enhanced h1, .note-prose.enhanced h2, .note-prose.enhanced h3 { color: var(--heading); }
 .note-prose.enhanced strong, .note-prose .mine { color: var(--ink); }
+.note-prose h4 { font-size: 15px; font-weight: 600; margin-top: 1.2em; }
+.note-prose table { width: 100%; border-collapse: collapse; margin-block: 1em; font-size: 14px; table-layout: fixed; }
+.note-prose :is(th,td) { border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); padding: .55em .7em; vertical-align: top; overflow-wrap: anywhere; }
+.note-prose th { background: color-mix(in srgb, var(--ink) 5%, transparent); font-weight: 600; text-align: start; }
+.note-prose :is(th,td) p { margin: 0; }
+.note-prose .record-diagram { margin: 1.3em 0; padding: .8em; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); border-radius: 8px; }
+.record-diagram figcaption { font-size: 13px; font-weight: 600; margin-bottom: .6em; }
+.record-diagram-preview { overflow-x: auto; text-align: center; font-size: 13px; }
+.record-diagram-preview svg { display: block; max-width: 100%; height: auto; margin-inline: auto; }
+.record-diagram details { margin-top: .7em; font-size: 12px; color: var(--muted); }
+.record-diagram summary { cursor: pointer; }
+.record-diagram textarea { display: block; width: 100%; min-height: 150px; margin-top: .5em; padding: .6em; background: transparent; color: var(--ink); font-family: monospace; font-size: 12px; resize: vertical; }
 /* the chat's answers have no gutter for the # */
 .chat-answer h1::before, .chat-answer h2::before, .chat-answer h3::before { content: none; }
 @keyframes fade-in { from { opacity: 0.4; } to { opacity: 1; } }

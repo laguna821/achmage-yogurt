@@ -24,7 +24,7 @@ const before = (pairs: string[] = []): EngineMessage[] => pairs.map((content, i)
  * one sequence for its whole life, let go when the queue says so. It remembers what the sequence starts with, so a
  * read ahead only sends what is new.
  */
-export function createNotesModel(o: { engine: Engine; modelPath: () => string | undefined; onLoaded?: (path: string) => void }) {
+export function createNotesModel(o: { engine: Engine; modelPath: () => string | undefined; onLoaded?: (path: string) => void; recordMode?: boolean }) {
   let loaded: { path: string; contextSize: number } | undefined
   let loading: Promise<{ path: string; contextSize: number }> | undefined
   /** the text the model's sequence starts with (the first message of what it last read): what a read ahead builds on */
@@ -58,6 +58,7 @@ export function createNotesModel(o: { engine: Engine; modelPath: () => string | 
     async llm(signal?: AbortSignal): Promise<Llm> {
       const m = await load()
       return {
+        ...(o.recordMode ? { recordMode: true } : {}),
         contextSize: m.contextSize,
         count: (texts) => o.engine.count(texts),
         chat: (prompt, onToken, opts) => {

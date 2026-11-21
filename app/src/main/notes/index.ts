@@ -47,7 +47,7 @@ export function hookNotes(p: {
   me?: () => string
 }) {
   const resuming = new Map<string, object>()
-  const live = new Map<string, { status: NoteStatus; draft: string; part?: { part: number; of: number }; step?: 'loading' }>()
+  const live = new Map<string, { status: NoteStatus; draft: string; part?: { part: number; of: number }; step?: NoteView['step'] }>()
   /** a rewrite for new people, waiting for the changes to settle */
   const rewriteTimers = new Map<string, NodeJS.Timeout>()
   const rewriting = new Set<string>()
@@ -76,7 +76,7 @@ export function hookNotes(p: {
     const saves = saved && Object.fromEntries(Object.entries(saved).map(([side, edit]) => [side, { revision: edit.revision, status: edit.status, ...(edit.reason ? { reason: edit.reason } : {}) }]))
     return { meetingId: id, mine: n.mine, enhanced: n.enhanced, edited: n.edited, status: l?.status ?? (n.enhanced != null ? 'done' : 'idle'), draft: l?.draft ?? '', peopleChanged: peopleChanged(id, n.enhanced != null) && !rewriteTimers.has(id) && !rewriting.has(id), ...(l?.part ? { part: l.part } : {}), ...(l?.step ? { step: l.step } : {}), ...(saves ? { saves } : {}) }
   }
-  const set = (id: string, status: NoteStatus, draft = '', part?: { part: number; of: number }, step?: 'loading') => { live.set(id, { status, draft, part, step }); p.send(view(id)) }
+  const set = (id: string, status: NoteStatus, draft = '', part?: { part: number; of: number }, step?: NoteView['step']) => { live.set(id, { status, draft, part, step }); p.send(view(id)) }
 
   const saveEdit = (id: string, side: NoteSide, md: string, revision?: number): NoteSaveResult => {
     const sides = edits.get(id) ?? {}, previous = sides[side]
@@ -128,13 +128,14 @@ export function hookNotes(p: {
     const used = { stamp: stamp(m.attendees) }
     writingPeople.set(id, used)
     const language = m.language ?? p.language(id)
-    let draft = '', last = 0, timer: NodeJS.Timeout | undefined
+    let draft = '', last = 0, timer: NodeJS.Timeout | undefined, recordMode = false
     // blank lines would show as empty paragraphs while streaming, then vanish once tidied: never shown
-    const flush = () => { timer = undefined; last = Date.now(); if (!signal.aborted) set(id, 'writing', draft.replace(/\n[ \t]*(?=\n)/g, '')) }
+    const flush = () => { timer = undefined; last = Date.now(); if (!signal.aborted) set(id, 'writing', recordMode ? draft : draft.replace(/\n[ \t]*(?=\n)/g, '')) }
     try {
       console.info('NOTES', `writing the notes of ${id}`)
       if (!quiet && p.showLoading && p.model.needsLoad?.()) set(id, 'waiting', '', undefined, 'loading')
       const llm = await p.model.llm(signal)
+      recordMode = !!llm.recordMode
       if (!quiet && live.get(id)?.step) set(id, 'waiting')
       // a generic title (or one made from earlier notes) gets one from these notes; theirs or the calendar's never
       const retitle = (x: Meeting) => x.titleSource === 'generic' || x.titleSource === 'auto'
@@ -145,7 +146,9 @@ export function hookNotes(p: {
         if (timer) return
         const wait = DRAFT_EVERY_MS - (Date.now() - last)
         if (wait <= 0) flush(); else timer = setTimeout(flush, wait)
-      }, (part, of) => { if (!signal.aborted && !quiet) set(id, 'writing', '', { part, of }) }, p.earlier?.(id))
+      }, (part, of) => { if (!signal.aborted && !quiet) set(id, 'writing', '', { part, of }) }, p.earlier?.(id), step => {
+        if (!signal.aborted && !quiet) set(id, 'waiting', '', undefined, step)
+      })
       if (timer) clearTimeout(timer)
       if (quiet) {
         // stopped for a recording: the queue runs it again. Edited (or written again by hand) meanwhile: theirs stands

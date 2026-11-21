@@ -135,8 +135,6 @@
   "English only": "Hanya Inggris",
   "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Hanya Inggris lebih cepat dan akurat. Pilih Multibahasa untuk rapat dalam bahasa lain.",
   "Everyone else": "Semua orang lain",
-  "Everything stays on your Mac.": "Semuanya tetap di Mac Anda.",
-  "Everything stays on your computer.": "Semuanya tetap di komputer Anda.",
   "Expand sidebar": "Luaskan bar samping",
   "Exported {count} meetings": "{count} rapat diekspor",
   "Exporting…": "Mengekspor…",
@@ -638,5 +636,8 @@
   "Dock only": "Hanya Dock",
   "Summary language": "Bahasa ringkasan",
   "Same as the meeting": "Sama dengan rapat",
-  "Used for new summaries and when you write them again.": "Digunakan untuk ringkasan baru dan saat menulisnya ulang."
+  "Used for new summaries and when you write them again.": "Digunakan untuk ringkasan baru dan saat menulisnya ulang.",
+  "Checking speakers, terms and topics…": "Memeriksa pembicara, istilah, dan topik…",
+  "Writing a detailed record…": "Menulis catatan terperinci…",
+  "Checking the record against the transcript…": "Mencocokkan catatan dengan transkrip…"
 }
