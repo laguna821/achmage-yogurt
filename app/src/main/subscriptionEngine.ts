@@ -18,6 +18,8 @@ export function subscriptionEnv(): NodeJS.ProcessEnv {
 }
 
 export function subscriptionCli(name: 'claude' | 'codex'): string {
+  const pinned = join(os.homedir(), '.local/opt/yogurt/tools/codex-0.171.0/node_modules/.bin/codex')
+  if (name === 'codex' && existsSync(pinned)) return pinned
   // Prefer the current official desktop engine to an older standalone PATH installation.
   if (name === 'codex' && existsSync('/usr/lib/chatgpt/resources/codex')) return '/usr/lib/chatgpt/resources/codex'
   for (const d of (subscriptionEnv().PATH ?? '').split(':')) {
