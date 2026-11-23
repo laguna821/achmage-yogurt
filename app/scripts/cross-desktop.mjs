@@ -3,7 +3,7 @@
 import {createHash} from 'node:crypto'
 import {execFileSync} from 'node:child_process'
 import {createRequire} from 'node:module'
-import {dirname,join,resolve} from 'node:path'
+import {basename,dirname,join,resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {chmodSync,copyFileSync,cpSync,existsSync,mkdirSync,readFileSync,readdirSync,writeFileSync} from 'node:fs'
 import {gunzipSync} from 'node:zlib'
@@ -65,6 +65,17 @@ if(!process.argv.includes('--prepare-only')){
   // Linux cannot re-sign a changed Mach-O; leave Electron's stock binary untouched.
   // This is an unsigned ZIP, with no signing/notarization invocation.
   if(!win)delete config.electronFuses
+  if(win&&process.platform==='linux'){
+    // electron-builder already ships this PE reader for Mac hosts. Use the same
+    // extraction on Linux so generating an unsigned uninstaller never starts Wine.
+    const {WineVmManager}=require('app-builder-lib/out/vm/WineVm.js')
+    const {UninstallerReader}=require('app-builder-lib/out/targets/nsis/nsisUtil.js')
+    WineVmManager.prototype.exec=async function(file,args){
+      if(basename(file)!=='Achmage-Yogurt-windows-x64.exe'||args?.length)throw new Error('Unexpected Windows executable during cross build: '+basename(file))
+      await UninstallerReader.exec(file,join(dirname(file),basename(file,'exe')+'__uninstaller.exe'))
+      return Buffer.alloc(0)
+    }
+  }
   const configPath=join(stage,'builder.json');writeFileSync(configPath,JSON.stringify(config,null,2))
   await build({projectDir:root,targets:(win?Platform.WINDOWS:Platform.MAC).createTarget(win?'nsis':'zip',win?Arch.x64:Arch.arm64),publish:'never',config:configPath})
 }

@@ -34,6 +34,7 @@ node app/scripts/cross-desktop.mjs darwin /absolute/temp/cross-mac
 ```
 
 - `unzip`, `tar`, 7zz가 필요합니다. Windows 기반 설치본을 추출할 때는 `SEVEN_ZIP=/absolute/path/to/7zz`로 지정할 수 있습니다.
+- Windows NSIS 제거 프로그램은 electron-builder에 포함된 `UninstallerReader`로 중간 PE에서 추출합니다. Linux의 Wine 초기화나 Windows 실행이 필요하지 않습니다. 교차 빌드 스크립트 안에서 해당 NSIS 호출만 한정해 바꿉니다.
 - 이 경로는 원래 Yogurt `v0.3.38`의 공개 설치본에서 **변경하지 않은** 플랫폼별 캡처·Whisper 헬퍼를 가져옵니다. 공식 release asset의 SHA256 digest로 확인합니다. 기존 앱 UI·개인 데이터는 가져오지 않습니다.
 - Codex 플랫폼 패키지는 npm의 실제 버전 별칭을 사용합니다. 다운로드의 npm integrity와 실행파일 SHA256을 기록합니다.
 - 생성된 플랫폼 전용 설정 JSON을 직접 전달하여 호스트 Linux 리소스와 섞이지 않게 합니다.
