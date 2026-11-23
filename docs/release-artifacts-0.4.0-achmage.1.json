@@ -1,0 +1,36 @@
+{
+  "version": "0.4.0-achmage.1",
+  "sourceCommit": "97d78365c3ddee4f6db93e6ee732a2e45efc5d2d",
+  "mainBundleSha256": "962b80c76ce111de415b4dbf48e9a9ccd760e63963875d55e0840f21663e2eb3",
+  "unsigned": true,
+  "notarized": false,
+  "actionsRuns": 0,
+  "artifacts": [
+    {
+      "file": "Achmage-Yogurt-linux-x86_64.AppImage",
+      "bytes": 459753401,
+      "sha256": "3d7d9dae27879e854c3b372612a14a51965b9425b1ccceb0cc8326d073f1a103"
+    },
+    {
+      "file": "Achmage-Yogurt-mac-arm64.zip",
+      "bytes": 437644952,
+      "sha256": "b4ef498ae57c32c0231585a4533e5cc6e42fe54d27e4eb79a60ea1c59891e8a3"
+    },
+    {
+      "file": "Achmage-Yogurt-windows-x64.exe",
+      "bytes": 390272447,
+      "sha256": "afcd5bbc8e26e76d0341287539c4ac307a16288e60367c6b4d84a66b81b52b5f"
+    }
+  ],
+  "unitTests": {
+    "passed": 2274,
+    "skipped": 17
+  },
+  "nativeExecutionVerified": [
+    "linux-x64"
+  ],
+  "crossBuildOnly": [
+    "win32-x64",
+    "darwin-arm64"
+  ]
+}
