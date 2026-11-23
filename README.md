@@ -1,184 +1,55 @@
-<p align="center">
-  <a href="https://yogurt.so?utm_source=github&utm_medium=readme&utm_campaign=yogurt">
-    <img src="docs/assets/readme-header.svg" width="212" height="86" alt="Yogurt. Take note.">
-  </a>
-</p>
+# Achmage Yogurt
 
-<p align="center">
-  Private AI meeting notes. A free, open-source alternative to Granola.
-</p>
+한국어 중심 녹음·외부 음성 전사와 맥락을 확인하는 기록 정리 도구입니다. [Frigade Yogurt](https://github.com/FrigadeHQ/yogurt)를 기반으로 만든 Achmage 개인 확장판입니다. 원본 Yogurt와 독립된 앱·프로필을 사용합니다.
 
-<p align="center">
-  Download for <a href="https://github.com/FrigadeHQ/yogurt/releases/latest/download/Yogurt-mac-arm64.dmg">Mac</a> · <a href="https://github.com/FrigadeHQ/yogurt/releases/latest/download/Yogurt-windows-x64.exe">Windows</a> · <a href="https://github.com/FrigadeHQ/yogurt/releases/latest/download/Yogurt-linux-x86_64.AppImage">Linux</a>
-</p>
+- 마이크·컴퓨터 소리 녹음과 로컬 Whisper 전사
+- 음성·영상 드롭, 기존 TXT/MD/SRT/VTT/Whisper JSON/PDF/DOCX 전사 가져오기, 음성과 전사 함께 가져오기
+- YouTube 개별 링크: 로컬 음성 전사 또는 기존 자막 가져오기 구분, 구간 선택, 작업 상태·중단·재시작
+- 회의·강의·세미나·콜로퀴움·인터뷰·대화 정리: 사전 자료, 발화자 단서, 링크, 문서·이메일·이미지 첨부
+- 선택한 로컬 볼트, 연결된 Gmail, 공개 웹의 근거 대조와 필요한 확인 질문
+- 기본 GPT-6.2 Sol / xhigh, 앱 설정에서 구독 AI 모델·추론 강도·Whisper 모델 선택
+- Markdown Live Preview / 읽기 / 원문 편집, 자동 저장, 이전 버전 복원과 새 정리본 비교·적용
+- Achmage SVG 로고, Atlas 색상을 참고한 20종 + Achmage Workbench + 참고 스크린샷 6종 = **27개 스킨**
 
-<p align="center">
-  <img src="docs/assets/yogurt-screenshot.webp" width="1074" alt="Yogurt showing the Summary of a launch planning meeting: the plan, next steps by person, and your own reminders">
-</p>
+![스킨 미리보기](docs/screenshots/skin-lime.png)
 
-<p align="center">
-  Yogurt records your calls without adding a bot to the meeting.
-</p>
-<p></p>
-<p align="center">
-  <sub>macOS 14.4+ (Apple Silicon) · Windows 10 2004+ (x64) · Ubuntu 22.04+ or similar (x64 AppImage) · 8 GB memory</sub><br><br>
-  <a href="https://yogurt.so?utm_source=github&utm_medium=readme&utm_campaign=yogurt">yogurt.so</a> · <a href="docs/README.md">Help</a> · <a href="docs/building.md">Build and run locally</a> · <a href="LICENSE">MIT license</a><br><br>
-  Made by <a href="https://frigade.com?utm_source=github&utm_medium=readme&utm_campaign=yogurt">Frigade</a>.
-</p>
+## 설치
 
-## What it does
+[Releases](https://github.com/laguna821/achmage-yogurt/releases)에서 플랫폼에 맞는 파일을 받으세요. 이 저장소는 비공개이므로 소유 계정 로그인이 필요합니다.
 
-- **Live transcripts.** Yogurt records calls and turns speech into text as you talk.
-- **Meeting summaries.** Yogurt writes up the conversation and any notes you add.
-- **Private by default.** Your audio, transcripts and AI processing stay on your computer.
-- **Free and open source.** You can use Yogurt without an account.
-- **Who said what.** Yogurt names speakers from Zoom, Teams and Meet on Mac only.
-- **Languages.** Multi-language mode transcribes 99 languages.
-- **Recording reminders.** Yogurt offers to record when a supported call starts.
-- **Answers with sources.** Yogurt answers questions across meetings and links to the source.
-- **Folders and search.** You can find meetings by folder, title, notes or transcript.
-- **Copy and export.** You can copy notes or transcripts, or save both as Markdown.
-- **Local MCP server.** When you turn this on, apps on your computer can read your notes, transcripts and saved audio.
-- **Automatic stop.** By default, Yogurt stops recording when it detects that your call has ended.
+| 플랫폼 | 파일 | 상태 |
+| --- | --- | --- |
+| Linux x64 | AppImage | 이 노트북에서 검증 |
+| Windows x64 | EXE | Linux 교차 빌드, 실기기 검증 필요 |
+| macOS Apple Silicon | ZIP 안의 Achmage Yogurt.app | Linux 교차 빌드, macOS 14.4 이상, 실기기 검증 필요 |
 
-## Watch the demo
+서명과 Apple 공증은 생략했습니다. Windows·macOS는 운영체제의 출처 확인 절차가 나타날 수 있습니다. Mac ZIP의 앱을 Applications로 옮겨 실행합니다. Mac Intel 빌드는 포함하지 않았습니다.
 
-https://github.com/user-attachments/assets/da16b894-beb1-491a-89e1-fd10666dc9b8
+모델은 설치본과 별도입니다. 첫 실행에서 로컬 Whisper를 준비합니다. large-v3-turbo Q5_0 약 574MB이며, 설정에서 더 작은 Whisper 모델도 선택할 수 있습니다. 구독 AI는 해당 기기의 ChatGPT/Codex 로그인이 필요합니다. 외부 AI 정리는 구독 사용량을 소비합니다.
 
-## How it works
+## 처음 사용하기
 
-1. **Record.** Start recording your microphone and call audio; you can add your own notes.
-2. **Transcribe.** Yogurt uses whisper.cpp and, on supported Macs, Apple SpeechAnalyzer.
-3. **Summarize and ask.** A local open-weight model runs through llama.cpp.
+1. 홈에서 녹음하거나 **음성·전사 가져오기 / YouTube 링크**를 누릅니다. Plaud 등의 녹음 파일도 직접 넣을 수 있습니다. 음성+기존 전사를 함께 넣으면 재전사를 생략합니다.
+2. 기록에서 **정리 설정**을 열어 녹음 종류, 결과 형태, 발화자 단서와 참고 자료를 넣습니다. 자료 없이 시작할 수도 있습니다.
+3. 필요한 맥락이 해결되지 않으면 앱의 확인 질문에 답합니다. 기존 문서를 다시 정리한 결과는 후보로 보관하여 비교 후 적용합니다.
+4. 정리본을 클릭해 편집합니다. 원문 Markdown은 그대로 보존하며 자동 저장됩니다.
+5. 설정의 **스킨·모양**에서 라이트·다크 팔레트를 따로 선택하고 즐겨찾기에 넣습니다.
 
-Meeting data stays local; Yogurt goes online for model downloads and update checks.
+Gmail은 설정에서 본인의 Google OAuth 데스크톱 클라이언트를 등록하고 로그인해야 합니다. 연결 전에는 메일을 검색하지 않습니다. 카카오톡은 TXT 내보내기·본문·스크린샷 첨부로 받으며 카카오 계정에 직접 로그인하지 않습니다. 볼트 검색은 읽기 전용입니다.
 
-<details><summary>Where your meetings, recordings, settings and models are stored</summary>
+## 데이터와 현재 범위
 
-- Mac uses `~/Library/Application Support/Yogurt`.
-- Windows uses `%APPDATA%\Yogurt`.
-- Linux uses `~/.config/Yogurt`, or `$XDG_CONFIG_HOME/Yogurt` if set.
+- 기존 `Yogurt` 프로필을 일관된 SQLite 스냅샷으로 복사해 `Achmage Yogurt` 프로필을 만듭니다. 원본 앱·DB·음성은 보존합니다. 기존 앱에서 녹음 중이면 먼저 녹음을 끝내야 합니다.
+- 업로드 원본, 해시, 가져오기 출처와 작업 단계는 로컬에 보관합니다. 중단된 ASR 재시작은 부분 전사를 별도 보관하고 전체 음성을 다시 처리합니다.
+- Whisper는 발화자의 실제 신원을 알아내는 모델이 아닙니다. 화자 이름은 제공한 단서와 근거를 바탕으로 확인하며, 불확실한 내용을 확정하지 않도록 설계했습니다.
+- TXT처럼 시간 정보가 없는 전사는 시각을 만들어 붙이거나 음성과 문장 위치를 자동 연결하지 않습니다.
+- PDF는 텍스트 PDF를 지원합니다. 스캔 PDF의 OCR은 현재 포함하지 않습니다. 이미지는 선택한 AI로 내용을 읽습니다.
+- YouTube는 공개 영상 기준입니다. 사이트의 로그인 요구·차단·자막 제공 여부에 따라 실패할 수 있습니다. 비공개·유료 영상 우회나 DRM 해제 기능은 없습니다.
+- 웹/모바일/PWA, Qwen/Gemma ASR 교체와 App Store 배포는 이번 버전에 포함하지 않았습니다.
+- 비공개 초기 버전은 자동 업데이트를 비활성화했습니다. GitHub Actions도 수동 실행만 가능하며 이번 빌드에는 사용하지 않았습니다.
 
-</details>
+개발·배포는 [RELEASE.md](docs/RELEASE.md), 검증 결과와 한계는 [VALIDATION.md](docs/VALIDATION.md), 설계는 [PLAN.md](docs/PLAN.md)를 참고하세요.
 
-## FAQ
+## 출처와 라이선스
 
-<details><summary><strong>What kind of computer do I need?</strong></summary>
-
-<br>
-
-> A Mac with Apple silicon and macOS 14.4 or newer, a 64-bit PC with Windows 10 (version 2004) or newer, or a 64-bit Linux computer with Ubuntu 22.04 or newer. Each needs at least 8 GB of memory. If your computer is too slow, Yogurt tells you during setup. Calendar and speaker names from calls are Mac only for now.
-
-</details>
-
-<details><summary><strong>Windows says “Windows protected your PC.” What do I do?</strong></summary>
-
-<br>
-
-> Click More info, then Run anyway. Windows shows this for new apps that aren’t signed with a Microsoft certificate yet. Yogurt is open source, so anyone can check what it does.
-
-</details>
-
-<details><summary><strong>Does Yogurt join my meetings?</strong></summary>
-
-<br>
-
-> No. Yogurt records your microphone and the sound playing on your computer. No bot joins the call, so let the other people on the call know you’re recording.
-
-</details>
-
-<details><summary><strong>Are recordings saved?</strong></summary>
-
-<br>
-
-> Audio is saved by default, and you can turn this off for future meetings in Settings.
-
-</details>
-
-<details><summary><strong>Is Yogurt free?</strong></summary>
-
-<br>
-
-> Yes. Yogurt is free and open source under the MIT license. No account is needed.
-
-</details>
-
-<details><summary><strong>Does Yogurt work offline?</strong></summary>
-
-<br>
-
-> Yes. After a one-time download of the AI models, transcription and summaries run locally on your computer.
-
-</details>
-
-<details><summary><strong>How much does setup download?</strong></summary>
-
-<br>
-
-> It depends on your computer. Yogurt sets up transcription first, then downloads the notes models selected for your computer. Recording works once setup finishes, and notes and questions work offline once the notes model is in.
-
-</details>
-
-<details><summary><strong>How do I connect my assistant app?</strong></summary>
-
-<br>
-
-> In **Settings → AI apps**, turn on access, copy the helper command, and add it as a local MCP server in your assistant app. Access is off by default. The app can read your meetings, notes and transcripts, but cannot change them. It may send what it reads to its own online model. Turn access off in Yogurt to stop further reads.
-
-</details>
-
-<details><summary><strong>Can other apps read my notes through MCP?</strong></summary>
-
-<br>
-
-> Access is off until you enable it in **Settings → AI apps**. Apps get read-only access to meetings, notes and transcripts. Mac and Linux use a socket in your profile folder with `0600` permissions, so only your user account can open it. Windows uses a named pipe with a new random name each launch, stored only in your profile folder. There is no per-app token, so any app running under your account can read while access is on. Settings shows connected apps by their self-reported names.
-
-</details>
-
-<details><summary><strong>Which AI models does Yogurt use?</strong></summary>
-
-<br>
-
-> Transcription uses Whisper through whisper.cpp, with large-v3-turbo or a smaller model depending on your computer. On supported Macs, Apple SpeechAnalyzer supplies live words while Whisper produces the saved transcript. Summaries and answers use a local open-weight model from the Gemma 4, gpt-oss or Qwen3 families, chosen for your hardware and run through llama.cpp. The app uses Electron and needs no account.
-
-</details>
-
-<details><summary><strong>Which languages does Yogurt support?</strong></summary>
-
-<br>
-
-> Pick **Multi-language** in **Settings → Language → Spoken language** to transcribe 99 languages. You can also switch from the **English** menu in a note’s footer before or during recording. English only is the default. Summaries follow the meeting’s main language; answers follow your question’s language. Settings also offers 32 app languages.
-
-</details>
-
-<details><summary><strong>Which call apps does Yogurt work with?</strong></summary>
-
-<br>
-
-> You can record calls in any app because Yogurt captures your microphone and system audio. Call detection covers Zoom, Teams and Meet. On Mac, Yogurt can also read their speaker names with Accessibility permission, when the call app shows who is speaking.
-
-</details>
-
-<details><summary><strong>How does Yogurt know a call has started?</strong></summary>
-
-<br>
-
-> It checks which apps are using your microphone. For browser calls, it also checks the tab title or a nearby calendar event with a call link. This triggers an offer to record; recording starts only when you choose to.
-
-</details>
-
-<details><summary><strong>How do I connect my calendar?</strong></summary>
-
-<br>
-
-> On Mac, allow Calendar access in Settings. Yogurt reads the calendars already on your computer and lets you choose which ones to show. You do not sign into a calendar account in Yogurt.
-
-</details>
-
-## Build from source
-
-See [Build and run locally](docs/building.md) for setup, tests and installer builds.
-
-## License
-
-[MIT](LICENSE) · Copyright 2026 Frigade.
+기반 Yogurt는 Frigade의 MIT 소프트웨어입니다. 원래 저작권 고지와 [LICENSE](LICENSE)를 유지합니다. Achmage 로고 자산과 27개 팔레트는 요청받은 참조를 사용했으며 타사 서비스의 제휴·공식 앱을 뜻하지 않습니다. 포함된 Node, CPython, Codex, FFmpeg, yt-dlp 및 라이브러리의 별도 라이선스·버전은 설치본 `resources/licenses`와 `resources/tools/manifest.json`에 있습니다. FFmpeg 정적 빌드에는 GPL/LGPL 의무가 별도로 적용됩니다.

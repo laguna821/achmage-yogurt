@@ -1,3 +1,4 @@
+import { browserSubscriptionLogin } from './subscriptionLogin'
 import { ipcMain } from 'electron'
 import { join } from 'node:path'
 import { existsSync, lstatSync, rmSync } from 'node:fs'
@@ -14,6 +15,7 @@ export const localAiBytes = (profile: string) => localAiFiles(profile).reduce((n
 
 export function hookSubscriptionSettings(profile: string, busy: () => boolean) {
   const file = join(profile, 'settings.json'), cwd = join(profile, 'subscription-runtime')
+  ipcMain.handle('subscription:connect', () => browserSubscriptionLogin())
   ipcMain.handle('subscription:status', async () => {
     const [claude, codex, metadata] = await Promise.all([subscriptionLogin('claude', cwd), subscriptionLogin('codex', cwd), subscriptionMetadata()])
     return { model: subscriptionModel(loadSettings(file).aiModel), effort: reasoningEffort(loadSettings(file).aiReasoningEffort), claude, codex, ...metadata, localModelBytes: localAiBytes(profile) }

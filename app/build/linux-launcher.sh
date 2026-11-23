@@ -6,4 +6,5 @@ here=$(dirname "$(readlink -f "$0")")
 case " $* " in *" --ozone-platform"*) ;; *)
   [ -n "$WAYLAND_DISPLAY" ] && [ -n "$DISPLAY" ] && set -- --ozone-platform=x11 "$@" ;;
 esac
-exec "$here/yogurt-bin" "$@"
+name=$(basename "$0")
+exec "$here/$name-bin" "$@"

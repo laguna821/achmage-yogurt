@@ -11,20 +11,20 @@ it('uninstalling on Windows never deletes the profile: it holds every meeting', 
 })
 
 it('Windows and Linux builds have fixed file names, like the Mac one', () => {
-  expect(config).toContain('artifactName: Yogurt-mac-${arch}.${ext}')
-  expect(config).toContain('artifactName: Yogurt-windows-${arch}.${ext}')
-  expect(config).toContain('artifactName: Yogurt-linux-${arch}.${ext}')
+  expect(config).toContain('artifactName: Achmage-Yogurt-mac-${arch}.${ext}')
+  expect(config).toContain('artifactName: Achmage-Yogurt-windows-${arch}.${ext}')
+  expect(config).toContain('artifactName: Achmage-Yogurt-linux-${arch}.${ext}')
 })
 
 it("only Windows and Linux carry the colour tray icons (the Mac's package keeps its own files)", () => {
   const block = (name: string) => config.match(new RegExp(`^${name}:\\n((?:  .*\\n|\\n)*)`, 'm'))?.[1] ?? ''
-  for (const os of ['win', 'linux']) expect(block(os)).toContain('filter: ["tray-color*.png", "tray-recording*.png"]')
+  for (const os of ['win', 'linux']) expect(block(os)).toMatch(/filter:\n\s+- tray-color\*\.png\n\s+- tray-recording\*\.png/)
   expect(config.split(/^win:$/m)[0]).not.toContain('tray-color')
 })
 
 it("only Windows and Linux carry the speed check's clip: a Mac never times its speech model", () => {
   const block = (name: string) => config.match(new RegExp(`^${name}:\\n((?:  .*\\n|\\n)*)`, 'm'))?.[1] ?? ''
-  for (const os of ['win', 'linux']) expect(block(os)).toContain('{ from: resources/speed, to: speed }')
+  for (const os of ['win', 'linux']) expect(block(os)).toMatch(/from: resources\/speed\n\s+to: speed/)
   expect(config.split(/^win:$/m)[0]).not.toContain('resources/speed')
 })
 

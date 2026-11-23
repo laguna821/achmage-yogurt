@@ -1,0 +1,8 @@
+import{useEffect,useState}from'react'
+import{SpokenSetting}from'./SpokenSetting'
+import{Jargon}from'./Jargon'
+export function SpeechSettings(){
+  const[state,setState]=useState<{selected:string;models:{id:string;name:string;bytes:number}[]}>(),[choice,setChoice]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('')
+  useEffect(()=>{void window.yogurt.speech.get().then(s=>{setState(s);setChoice(s.selected)})},[])
+  return <section><h2 className="settings-section-heading">로컬 음성 전사</h2><div className="settings-group"><div className="settings-row"><div className="settings-row-copy"><p className="settings-label">Whisper 모델</p><p className="settings-description">한국어와 영어 용어가 섞인 녹음에는 large-v3-turbo를 기본으로 사용합니다. 작은 모델은 용량이 작고 빠르지만 정확도가 달라질 수 있습니다.</p></div></div><div className="settings-row"><label htmlFor="speech-model">전사 모델</label><select id="speech-model" className="settings-select" disabled={busy||!state} value={choice} onChange={e=>setChoice(e.target.value)}>{state?.models.map(m=><option key={m.id} value={m.id}>{m.name} · {(m.bytes/1e6).toFixed(0)}MB</option>)}</select><button className="workspace-button" disabled={busy||!choice||choice===state?.selected} onClick={async()=>{setBusy(true);setMessage('모델을 준비하고 있습니다. 기존 모델 파일은 보존합니다.');try{const r=await window.yogurt.speech.select(choice);setMessage(r.message);if(r.ok)setState(await window.yogurt.speech.get())}catch(e){setMessage(String(e))}finally{setBusy(false)}}}>{busy?'모델 준비 중…':'모델 다운로드·적용'}</button></div>{message&&<div className="settings-row"><p role="status">{message}</p></div>}<SpokenSetting/></div><Jargon/></section>
+}

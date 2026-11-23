@@ -53,8 +53,17 @@ export async function hookMcp(d: {
   // what the helper starts when Yogurt is closed (Windows, Linux): recorded each launch, as an AppImage can move
   const launch = launchCommand(process.platform, app.isPackaged, process.execPath, process.env)
   if (launch) { try { writeWhole(join(d.profile, LAUNCH_FILE), launch) } catch (e) { console.error('mcp: could not record how to open Yogurt', e) } }
-  const copy = copyHelper(d.profile)
-  const status = () => ({ enabled: d.enabled(), clients: server?.clients() ?? [], command: copy ?? mcpHelperPath() })
+  const toolRoot=join(process.resourcesPath||'','tools'),node=join(toolRoot,process.platform==='win32'?'node.exe':'node'),relay=join(toolRoot,'achmage-mcp.mjs')
+  let bridge:{command:string;args?:string[];env?:Record<string,string>}
+  if(existsSync(node)&&existsSync(relay)){
+    let command=node,script=relay
+    if(process.platform==='linux'){
+      command=join(d.profile,'bin/achmage-mcp-node');script=join(d.profile,'bin/achmage-mcp.mjs')
+      installHelper(node,command);installHelper(relay,script)
+    }
+    bridge={command,args:[script],env:{YOGURT_USER_DATA:d.profile}}
+  }else bridge={command:copyHelper(d.profile)??mcpHelperPath(),env:{YOGURT_USER_DATA:d.profile}}
+  const status = () => ({ enabled: d.enabled(), clients: server?.clients() ?? [], ...bridge })
   ipcMain.handle('mcp:status', status)
   ipcMain.handle('mcp:set', (_e, on: unknown) => { d.setEnabled(on === true); return status() })
   return { close: () => server?.close() }

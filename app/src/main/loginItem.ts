@@ -27,12 +27,12 @@ export function pcLoginOnStart(wanted: boolean | undefined, on: boolean): 'regis
 
 /** Linux: the XDG autostart entry (GNOME, KDE and the rest read ~/.config/autostart) */
 export const autostartFile = (env: Record<string, string | undefined>, home: string): string =>
-  posix.join(env.XDG_CONFIG_HOME || posix.join(home, '.config'), 'autostart', 'yogurt.desktop')
+  posix.join(env.XDG_CONFIG_HOME || posix.join(home, '.config'), 'autostart', 'achmage-yogurt.desktop')
 
 /** The entry: the AppImage, quoted the Desktop Entry way (any path, spaces and % included), started hidden */
 export function autostartEntry(appImage: string): string {
   const quoted = `"${appImage.replace(/(["`$\\])/g, '\\$1')}"`.replace(/\\/g, '\\\\').replace(/%/g, '%%')
-  return `[Desktop Entry]\nType=Application\nName=Yogurt\nExec=${quoted} --hidden\nX-GNOME-Autostart-enabled=true\n`
+  return `[Desktop Entry]\nType=Application\nName=Achmage Yogurt\nExec=${quoted} --hidden\nX-GNOME-Autostart-enabled=true\n`
 }
 
 /** on when the entry is there and not hidden (a desktop's startup settings may hide it instead of removing it) */

@@ -46,6 +46,7 @@ export function hookNotes(p: {
   /** the person's own name, so the invite's other person is known */
   me?: () => string
   manual?: boolean
+  propose?: (id: string, md: string) => void
   organize?: (id: string, input: import('./enhance').PromptInput, llm: Llm, onToken: (s: string) => void, signal: AbortSignal) => Promise<string>
   organized?: (id: string, md: string) => void
 }) {
@@ -167,6 +168,7 @@ export function hookNotes(p: {
         return
       }
       if (signal.aborted) { set(id, 'waiting'); return }
+      if (p.propose && was.enhanced !== null) { p.propose(id, md); p.organized?.(id, md); finish(m, 'done'); return }
       // the person's own notes stay as they typed them, even if they typed on while this was written
       p.store.setNotes(id, { enhanced: md, edited: false })
       p.store.setWrittenWith(id, used.stamp)

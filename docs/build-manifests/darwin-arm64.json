@@ -1,0 +1,49 @@
+{
+  "platform": "darwin",
+  "arch": "arm64",
+  "preparedAt": "2026-11-23T14:17:50.055Z",
+  "upstreamNative": "v0.3.38",
+  "records": [
+    {
+      "name": "Yogurt-mac-arm64.zip",
+      "source": "https://github.com/FrigadeHQ/yogurt/releases/download/v0.3.38/Yogurt-mac-arm64.zip",
+      "sha256": "4a1056b25122fe91564ba5e289ce79f50902d473d99fa7f836209e5c1c606416"
+    },
+    {
+      "name": "ffmpeg-darwin-arm64.gz",
+      "source": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64.gz",
+      "sha256": "8923876afa8db5585022d7860ec7e589af192f441c56793971276d450ed3bbfa"
+    },
+    {
+      "name": "darwin-arm64.LICENSE",
+      "source": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/darwin-arm64.LICENSE",
+      "sha256": "cb48bf09a11f5fb576cddb0431c8f5ed0a60157a9ec942adffc13907cbe083f2"
+    },
+    {
+      "name": "darwin-arm64.README",
+      "source": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/darwin-arm64.README",
+      "sha256": "05ba4b92c96605434b1aaae3eedf5a2c280c9607bf78ffca9a5b536d9af2dc6a"
+    },
+    {
+      "name": "node",
+      "source": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-darwin-arm64.tar.gz",
+      "sha256": "ff6e17d4874b76d272212b908cc020d6e815fba5a6c7eaaa06add725840307fd"
+    },
+    {
+      "name": "yt-dlp_macos",
+      "source": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_macos",
+      "sha256": "0f922c15ccc0b83eefa1c8bc9104e434318c4bf16e408e1ee93b7745a6efe0aa"
+    },
+    {
+      "name": "cpython-3.13.18+20261110-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "source": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "7a2384641584ab9984221fcb0fc9265df465922af71be71410529e2a9c3f0540"
+    },
+    {
+      "name": "codex",
+      "source": "@openai/codex@0.171.0-darwin-arm64",
+      "integrity": "sha512-hIYTkRUpuYpkVfTq4cpby0PXqhAVcIgE7f6FoyY1lt2RyARj3GXS1Can/dIYUBItVhXzhb98HYHZNzCX74QRlQ==",
+      "sha256": "fc8d77cf7585aded2b9bc487dad29c4ee2f066123e4e76dd3b17653a8322ce42"
+    }
+  ]
+}

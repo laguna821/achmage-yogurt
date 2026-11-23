@@ -18,7 +18,7 @@ import { followTarget, inView } from '../../../shared/follow'
 import { afterFinal, joinWords } from '../../../shared/liveWords'
 
 type Line = Omit<Segment, 'id'> & { id?: number }
-const key = (l: { track: string; startMs: number }) => `${l.track}:${l.startMs}`
+const key = (l: { track: string; startMs: number; endMs?:number; id?:number }) => `${l.track}:${l.startMs}${l.startMs===0&&l.endMs===0&&l.id!==undefined?':'+l.id:''}`
 /** this close to the bottom still counts as reading the latest lines */
 const STICK_PX = 24
 /** after their own scroll, playing waits this long before it moves the list, so it never takes over mid-gesture */
@@ -155,6 +155,8 @@ export function Transcript({ id, recording, inline = false, active = true, onClo
   focus?: { ms: number; match?: string; seq: number }
 }) {
   const { lines: allLines, live, loaded } = useLines(id)
+  const [untimed,setUntimed]=useState(false)
+  useEffect(()=>{let active=true;setUntimed(false);void window.yogurt.imports.info(id).then(info=>{if(active)setUntimed(info?.timed===false)});return()=>{active=false}},[id])
   const loadingPhase = useLoadingState(!loaded)
   const { live: liveSaid, previewed } = useLive(id, recording)
   // the mic's copy of the call (hidden as an echo) never shows
@@ -356,8 +358,9 @@ export function Transcript({ id, recording, inline = false, active = true, onClo
   )
 
   return (
-    <Surface style={{ '--playback-inset': `${playbackInset}px` } as CSSProperties} data-testid="transcript-panel" aria-label={t('Transcript')} onKeyDown={(e) => { if (!inline && e.key === 'Escape') { e.stopPropagation(); onClose?.() } }}
+    <Surface style={{ '--playback-inset': `${playbackInset}px` } as CSSProperties} data-testid="transcript-panel" data-untimed={untimed||undefined} aria-label={t('Transcript')} onKeyDown={(e) => { if (!inline && e.key === 'Escape') { e.stopPropagation(); onClose?.() } }}
       className={inline ? 'transcript-inline' : 'chat-in pointer-events-auto absolute inset-x-0 bottom-1 z-20 mx-auto flex h-[min(44vh,480px)] w-[min(720px,calc(100%-48px))] flex-col rounded-xl border border-line bg-float shadow-[var(--shadow)]'}>
+      {untimed&&<p className="import-timing-notice">기존 전사에 시간 정보가 없습니다. 음성과 문장의 위치를 연결하지 않았습니다.</p>}
       {active && (toolbar ? createPortal(tools, toolbar) : tools)}
       <div className="transcript-scroll-wrap relative flex min-h-0 flex-1 flex-col">
         <ScrollFade enabled={active && loaded}><ol data-loaded={loaded} data-loading-phase={loadingPhase} data-testid="transcript" ref={list} onScroll={onScroll} onWheel={theirs} onTouchStart={theirs} onPointerDown={theirs} onKeyDownCapture={theirs} onKeyDown={onKeyDown} className="loading-content transcript-loading-content flex flex-1 flex-col gap-2 overflow-y-auto px-4 pb-4 pt-2 text-sm leading-[1.55]">
@@ -386,7 +389,7 @@ export function Transcript({ id, recording, inline = false, active = true, onClo
                       return (
                         <Fragment key={k}>{i > 0 && ' '}
                           <Row line={x} focused={k === focusedKey} name={who(x)} query={typed}
-                            playing={k === shownKey} playable={playable} focusable={k === tabKey} arrived={live.current.has(k) ? (previewed(x) ? 'settle' : 'fade') : null} onPlay={onPlay} onFocusLine={setFocusKey} />
+                            playing={k === shownKey} playable={playable&&!untimed} focusable={k === tabKey} arrived={live.current.has(k) ? (previewed(x) ? 'settle' : 'fade') : null} onPlay={onPlay} onFocusLine={setFocusKey} />
                         </Fragment>
                       )
                     })}

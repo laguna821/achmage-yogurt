@@ -1,3 +1,5 @@
+import { publicText,webPlain } from './publicWeb'
+import { localVaultPath,localVaultEvidence } from './localSources'
 import type { GmailConnector } from './gmail'
 import type { ConnectorStatus, Evidence, RecordIssue } from '../../shared/organizer'
 import { localMcpConfigs, mcpText, ReadOnlyMcp, type McpTool } from './mcpClient'
@@ -8,7 +10,10 @@ export async function suppliedLinks(links: string, signal?: AbortSignal): Promis
   const urls = [...new Set(links.split(/\s+/).filter(s => /^https?:\/\//i.test(s)))].slice(0, 8)
   const config = localMcpConfigs().lightpanda, evidence: Evidence[] = [], log: string[] = []
   if (!urls.length) return { evidence, log }
-  if (!config) return { evidence, log: ['첨부 링크를 읽을 웹 연결이 없습니다. 주소만 참고했고 내용을 검증하지 않았습니다.'] }
+  if (!config) {
+    for (const url of urls) { try { const u=new URL(url); if (/mail\.google\.com$/.test(u.hostname)) throw new Error('메일 링크는 Gmail 연결 필요'); const text=webPlain(await publicText(url,signal)); if(text.length<80 || /sign in to continue|access denied/i.test(text.slice(0,400)))throw new Error('본문 확인 불가'); evidence.push({id:'L'+(evidence.length+1),provider:'web',title:'첨부 링크 · '+u.hostname,locator:url,text:text.slice(0,20000),issueIds:[]}) } catch(e) { if(signal?.aborted)throw e;log.push('링크 본문을 확인하지 못했습니다. 파일 또는 본문 첨부가 필요합니다: '+new URL(url).hostname) } }
+    return {evidence,log}
+  }
   const client = new ReadOnlyMcp(config, new Set(['markdown']), signal)
   try {
     for (const url of urls) {
@@ -27,15 +32,16 @@ export type EvidenceLookup = { evidence: Evidence[]; status: ConnectorStatus; lo
 export function connectorOverview(nativeMail = false): ConnectorStatus[] {
   const configs = localMcpConfigs()
   return [
-    { provider: 'vault', connected: !!configs.achmage, detail: configs.achmage ? 'Achmage 읽기 연결 사용 가능' : '이 컴퓨터의 Achmage 연결이 없습니다.' },
+    { provider: 'vault', connected: !!configs.achmage || !!localVaultPath(), detail: localVaultPath() ? '선택한 볼트 폴더 사용 가능' : configs.achmage ? 'Achmage 읽기 연결 사용 가능' : '이 컴퓨터의 Achmage 연결이 없습니다.' },
     { provider: 'mail', connected: nativeMail || Object.keys(configs).some(k => /gmail|google.?workspace/i.test(k)), detail: nativeMail ? 'Yogurt Gmail 읽기 연결 사용 가능' : Object.keys(configs).some(k => /gmail|google.?workspace/i.test(k)) ? 'Gmail 읽기 도구를 실행 시 확인합니다.' : '이 컴퓨터에 Gmail 연결이 없습니다. 다른 컴퓨터의 연결은 공유되지 않습니다.' },
-    { provider: 'web', connected: !!configs.lightpanda, detail: configs.lightpanda ? '공개 명칭 검색 사용 가능' : '이 컴퓨터의 웹 검색 연결이 없습니다.' },
+    { provider: 'web', connected: true, detail: configs.lightpanda ? '공개 명칭 검색 사용 가능' : '기본 공개 웹 연결 · 접근 불가 자료는 확인 질문으로 남깁니다.' },
   ]
 }
 
 export async function vaultEvidence(issues: RecordIssue[], seed: string, signal?: AbortSignal): Promise<EvidenceLookup> {
   const config = localMcpConfigs().achmage, evidence: Evidence[] = [], log: string[] = []
   const status: ConnectorStatus = { provider: 'vault', connected: !!config, detail: config ? '볼트의 관련 자료를 읽었습니다.' : 'Achmage 연결 없음 · 건너뜀' }
+  if (localVaultPath()) return localVaultEvidence(issues, seed, signal)
   if (!config) return { evidence, status, log }
   const client = new ReadOnlyMcp(config, new Set(['search', 'read_source']), signal)
   try {
@@ -79,7 +85,16 @@ export function publicEntity(value?: string): string | undefined {
 export async function webEvidence(issues: RecordIssue[], signal?: AbortSignal): Promise<EvidenceLookup> {
   const config = localMcpConfigs().lightpanda, evidence: Evidence[] = [], log: string[] = []
   const status: ConnectorStatus = { provider: 'web', connected: !!config, detail: config ? '공개 명칭을 검색했습니다.' : '웹 연결 없음 · 건너뜀' }
-  if (!config) return { evidence, status, log }
+  if (!config) {
+    for (const issue of issues.filter(i=>publicEntity(i.publicEntity)).slice(0,3)) {
+      try { const html=await publicText('https://html.duckduckgo.com/html/?q='+encodeURIComponent(publicEntity(issue.publicEntity)+' 공식'),signal)
+        const urls=[...html.matchAll(/href="([^"]+)"/g)].map(m=>m[1].replace(/&amp;/g,'&')).flatMap(h=>{try{const u=new URL(h,'https://duckduckgo.com'); const target=u.searchParams.get('uddg');return target?[target]:[]}catch{return []}})
+        for(const url of [...new Set(urls)].slice(0,2)){try{const text=webPlain(await publicText(url,signal));if(text.length<100)continue;evidence.push({id:'W'+(evidence.length+1),provider:'web',title:publicEntity(issue.publicEntity)||'공개 명칭',locator:url,text:text.slice(0,6500),issueIds:[issue.id]})}catch{if(signal?.aborted)throw new Error('Stopped')}}
+      } catch(e) {if(signal?.aborted)throw e;log.push('공개 웹 검색 결과를 확인하지 못했습니다.')}
+    }
+    status.connected=true;status.detail=evidence.length?`공개 원문 ${evidence.length}건을 읽었습니다.`:'관련 공개 원문을 확인하지 못했습니다. 추정을 확정하지 않습니다.'
+    return {evidence,status,log}
+  }
   const targets = issues.filter(i => (i.category === 'term' || i.category === 'speaker') && publicEntity(i.publicEntity)).slice(0, 3)
   if (!targets.length) { status.detail = '공개 명칭 검색이 필요한 항목 없음'; return { evidence, status, log } }
   const client = new ReadOnlyMcp(config, new Set(['search', 'markdown']), signal)

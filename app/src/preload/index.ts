@@ -1,10 +1,15 @@
 import type { WidgetLayout } from '../shared/widgetMorph'
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { capabilities, platformOf } from '../shared/platform'
 import type { ChatView, ConversationSummary, ConversationView, NoteView, PromptAction, SetupState, UpdateStatus, WidgetView, YogurtApi } from '../shared/types'
 
 const api: YogurtApi = {
+  speech: {get:()=>ipcRenderer.invoke('speech:get'),select:id=>ipcRenderer.invoke('speech:select',id)},
+  versions: { restore: (id,revision,expected) => ipcRenderer.invoke('versions:restore',id,revision,expected), list: id => ipcRenderer.invoke('versions:list',id), read: (id,revision) => ipcRenderer.invoke('versions:read',id,revision), candidate: id => ipcRenderer.invoke('versions:candidate',id), accept: (id,expected) => ipcRenderer.invoke('versions:accept',id,expected) },
+  imports: { info: id => ipcRenderer.invoke('imports:info',id), pick: () => ipcRenderer.invoke('imports:pick'), describe: paths => ipcRenderer.invoke('imports:describe', paths), filePath: file => webUtils.getPathForFile(file), start: request => ipcRenderer.invoke('imports:start', request), list: () => ipcRenderer.invoke('imports:list'), cancel: id => ipcRenderer.invoke('imports:cancel', id), retry: id => ipcRenderer.invoke('imports:retry', id), tools: () => ipcRenderer.invoke('imports:tools'), onChange: cb => { const fn = (_e: unknown, jobs: import('../shared/imports').ImportJob[]) => cb(jobs); ipcRenderer.on('imports:changed', fn); return () => { ipcRenderer.removeListener('imports:changed', fn) } } },
+  appearance: { get: () => ipcRenderer.invoke('appearance:get'), set: patch => ipcRenderer.invoke('appearance:set', patch), onChange: cb => { const fn = (_e: unknown, s: import('../shared/appearance').Appearance) => cb(s); ipcRenderer.on('appearance:changed', fn); return () => { ipcRenderer.removeListener('appearance:changed', fn) } } },
   organizer: {
+    vault: {get:()=>ipcRenderer.invoke('sources:vault'),choose:()=>ipcRenderer.invoke('sources:choose-vault'),clear:()=>ipcRenderer.invoke('sources:clear-vault')},
     get: id => ipcRenderer.invoke('organizer:get', id),
     configure: (id, options, context) => ipcRenderer.invoke('organizer:configure', id, options, context),
     attach: id => ipcRenderer.invoke('organizer:attach', id),
@@ -19,6 +24,7 @@ const api: YogurtApi = {
     gmail: {status: () => ipcRenderer.invoke('gmail:status'), importClient: () => ipcRenderer.invoke('gmail:import-client'), connect: () => ipcRenderer.invoke('gmail:connect'), disconnect: () => ipcRenderer.invoke('gmail:disconnect'), guide: () => ipcRenderer.invoke('gmail:guide')},
   },
   subscription: {
+    connect: () => ipcRenderer.invoke('subscription:connect'),
     status: () => ipcRenderer.invoke('subscription:status'),
     apply: (model, effort) => ipcRenderer.invoke('subscription:apply', model, effort),
     test: () => ipcRenderer.invoke('subscription:test'),

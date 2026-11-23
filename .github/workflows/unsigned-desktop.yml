@@ -1,0 +1,68 @@
+name: Build unsigned desktop installers
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Build target (runs only when explicitly requested)
+        type: choice
+        options: [all, windows, mac, linux]
+        default: all
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.ref }}-${{ inputs.platform }}
+  cancel-in-progress: true
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.choose.outputs.matrix }}
+    steps:
+      - id: choose
+        env:
+          TARGET: ${{ inputs.platform }}
+        run: |
+          case "$TARGET" in
+            windows) value='["windows-latest"]' ;;
+            mac) value='["macos-26"]' ;;
+            linux) value='["ubuntu-latest"]' ;;
+            *) value='["windows-latest","macos-26","ubuntu-latest"]' ;;
+          esac
+          echo "matrix=$value" >> "$GITHUB_OUTPUT"
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 55
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libpulse-dev libasound2-dev pkg-config cmake
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C app typecheck
+      - run: pnpm -C app exec vitest run test/imports.test.ts test/appearance.test.ts test/notes.test.ts test/subscriptionEngine.test.ts
+      - run: pnpm -C app native
+      - run: pnpm -C app prepare:tools
+      - run: pnpm -C app exec electron-vite build
+      - run: pnpm -C app exec electron-builder --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Achmage-Yogurt-${{ runner.os }}-${{ runner.arch }}
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            app/dist/*.exe
+            app/dist/*.dmg
+            app/dist/*mac*.zip
+            app/dist/*.AppImage
+            app/resources/tools/manifest.json

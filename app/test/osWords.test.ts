@@ -26,7 +26,6 @@ describe('Mac text', () => {
   const MAC = [
     'Apps on this Mac can read your meetings, notes, transcripts and recordings. If an app uses an online AI, what it reads goes to that AI.',
     'Connect the calendars on this Mac to see your upcoming meetings.',
-    'Everything stays on your Mac.',
     'Its notes, transcript and recording are removed from this Mac for good.',
     'Match my Mac',
     'No calendars found on this Mac.',
@@ -49,7 +48,7 @@ describe('Mac text', () => {
   })
   it('has a Windows and Linux sentence beside each one shown there', () => {
     for (const k of [
-      'Everything stays on your computer.', 'Saved on this computer',
+      'Saved on this computer',
       'Yogurt stores your meetings, notes and audio on this computer.', 'Apps on this computer can read your meetings, notes, transcripts and recordings. If an app uses an online AI, what it reads goes to that AI.',
       'Match Windows', 'Match my system', 'Open Yogurt when Windows starts', 'Open Yogurt when you log in',
       'Show Yogurt in the notification area', 'Show Yogurt in the tray', 'Show in File Explorer', 'Show in Files',

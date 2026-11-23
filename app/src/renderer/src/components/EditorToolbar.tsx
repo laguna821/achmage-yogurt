@@ -1,3 +1,4 @@
+import '@tiptap/starter-kit'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useEditorState, type Editor } from '@tiptap/react'
 import { BubbleMenu, type BubbleMenuProps } from '@tiptap/react/menus'

@@ -19,6 +19,7 @@ export type SpeedDeps = {
 export type SetupDeps = {
   /** This local build uses official subscription clients for notes; never download LLM/embedding weights. */
   subscription?: boolean
+  selectedAsr?: () => string | undefined
   getHardware(): Promise<Hardware>
   /** the catalog in this build; never waits on the network */
   getCatalog(): Promise<Catalog>
@@ -281,9 +282,15 @@ export class SetupController {
     }
   }
 
+  async changeSpeechModel() {
+    if (this.busy || !this.deps.subscription) return false
+    this.busy=true
+    try { await this.run(); return this._state.phase === 'ready' } finally { this.busy=false }
+  }
+
   private async runSubscription() {
     const catalog = await this.deps.getCatalog()
-    const selected = this.deps.speed?.load()?.model ?? 'whisper-large-v3-turbo-q5_0'
+    const selected = this.deps.selectedAsr?.() ?? this.deps.speed?.load()?.model ?? 'whisper-large-v3-turbo-q5_0'
     const model = catalog.asr.find(m => m.id === selected)
     if (!model) throw new Error('The selected speech model is not in this build.')
     const path = await this.fetch({ url: model.url, sha256: model.sha256, bytes: model.bytes,

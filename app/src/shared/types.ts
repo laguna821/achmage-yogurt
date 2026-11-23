@@ -23,7 +23,12 @@ export type MeetingCard = StoredMeetingCard & { paused?: true }
 
 /** What the window sees of the app: window.yogurt (the preload bridge, contextIsolation on) */
 export type YogurtApi = {
+  speech: { get():Promise<{selected:string;models:{id:string;name:string;bytes:number}[]}>; select(id:string):Promise<{ok:boolean;message:string}> }
+  versions: { restore(id:string,revision:string,expected:string|null):Promise<boolean>; list(id: string): Promise<{id:string;side:string;reason:string;createdAt:number;chars:number}[]>; read(id:string,revision:string):Promise<{text:string;side:string}|undefined>; candidate(id:string):Promise<string|undefined>; accept(id:string,expected:string):Promise<boolean> }
+  imports: { info(id:string):Promise<{timed:boolean;kind:string}|undefined>; pick(): Promise<import('./imports').ImportFile[]>; describe(paths: string[]): Promise<import('./imports').ImportFile[]>; filePath(file: File): string; start(request: import('./imports').ImportRequest): Promise<import('./imports').ImportJob>; list(): Promise<import('./imports').ImportJob[]>; cancel(id: string): Promise<void>; retry(id: string): Promise<void>; tools(): Promise<{name:string;ready:boolean;version:string}[]>; onChange(cb: (jobs: import('./imports').ImportJob[])=>void): ()=>void }
+  appearance: { get(): Promise<import('./appearance').Appearance>; set(patch: Partial<import('./appearance').Appearance>): Promise<import('./appearance').Appearance>; onChange(cb: (state: import('./appearance').Appearance) => void): () => void }
   organizer: {
+    vault: { get(): Promise<string>; choose(): Promise<string>; clear(): Promise<string> }
     get(id: string): Promise<import('./organizer').OrganizerState>
     configure(id: string, options: import('./organizer').OrganizerOptions, context: import('./organizer').OrganizerContext): Promise<import('./organizer').OrganizerState>
     attach(id: string): Promise<import('./organizer').OrganizerState>
@@ -38,6 +43,7 @@ export type YogurtApi = {
     gmail: {status(): Promise<import('../main/organizer/gmail').GmailStatus>; importClient(): Promise<import('../main/organizer/gmail').GmailStatus>; connect(): Promise<import('../main/organizer/gmail').GmailStatus>; disconnect(): Promise<import('../main/organizer/gmail').GmailStatus>; guide(): Promise<void>}
   }
   subscription: {
+    connect(): Promise<import('./subscription').SubscriptionCheck>
     status(): Promise<import('./subscription').SubscriptionStatus>
     apply(model: import('./subscription').SubscriptionModel, effort?: import('./subscription').ReasoningEffort): Promise<import('./subscription').SubscriptionCheck>
     test(): Promise<import('./subscription').SubscriptionCheck>
@@ -455,7 +461,7 @@ export type ConversationView = {
 export type ConversationSummary = { id: string; title: string; updatedAt: number; chips: ContextTarget[]; draft: string }
 
 /** enabled: in Settings. clients: apps connected now. command: the program to give an AI app */
-export type McpStatus = { enabled: boolean; clients: string[]; command: string }
+export type McpStatus = { enabled: boolean; clients: string[]; command: string; args?:string[]; env?:Record<string,string> }
 /** Settings → Updates. available: this build updates itself (not in development or a preview); next: the version found */
 export type UpdateStatus = { version: string; available: boolean; on: boolean; state: 'idle' | 'checking' | 'latest' | 'downloading' | 'ready' | 'error'; next?: string
   /** the corner should offer Restart Yogurt for the version that downloaded (offersRestart) */

@@ -1,3 +1,4 @@
+import { ImportWorkspace } from '../components/ImportWorkspace'
 import { LoadingContent } from '../components/LoadingContent'
 import { StartRecording } from '../components/StartRecording'
 import { Mic } from '../components/Icons'
@@ -41,7 +42,7 @@ export function Home({ open, openFolder, agendaJump }: { open: (id: string) => v
   return <div data-testid="home" className={calendar ? 'native-home' : 'native-home no-agenda'}>
     <StartRecording testId="new-note" onGone={() => setCalendarRevision(revision => revision + 1)} />
     <div className="native-library" ref={past.setRoot} tabIndex={-1}>
-      <h1>{t('Your meetings')}</h1>
+      <ImportWorkspace onOpen={open}/><h1>{t('Your meetings')}</h1>
       <LoadingContent pending={!past.cards} testId="meetings-loading" skeleton={<MeetingListLoading />} className="library-load">{noMeetings ? <section data-testid="past-empty" className="library-empty empty-state"><div className="empty-state-content">
         <div className="empty-tile"><FileText size={28} strokeWidth={1.5} aria-hidden="true" /></div><h2>{t('Your notes will show up here')}</h2>
         <p>{t('Yogurt writes a summary after you finish recording.')}</p>

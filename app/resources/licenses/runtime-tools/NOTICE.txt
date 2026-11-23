@@ -1,0 +1,1 @@
+Runtime notices: yt-dlp (Unlicense, bundled dependencies retain their licenses); Node.js (MIT and bundled notices); CPython standalone (Python license and bundled notices); Codex (Apache-2.0); FFmpeg binary licensing follows ffmpeg-static build (GPL components may apply). Source versions and SHA256 are in tools/manifest.json.

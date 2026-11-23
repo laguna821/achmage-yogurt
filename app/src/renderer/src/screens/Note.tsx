@@ -1,3 +1,4 @@
+import { NoteVersions } from '../components/NoteVersions'
 import { OrganizerWorkspace } from '../components/OrganizerWorkspace'
 import { citationTargetIndex } from '../../../shared/citations'
 import { NoteReadingPane } from '../components/NoteReadingPane'
@@ -398,7 +399,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
                   focus={primary === 'notes' && at?.ms === null ? at : undefined} testId="note-mine" label={t('My notes')} className="min-h-[40vh]" markdown={notes.mine} placeholder={t('You can add notes here to guide the summary.')}
                   onChange={(md) => { typing.current = true; const next = { ...current.current!, mine: md }; current.current = next; setNotes(next); mineSave.change(md) }}
                   onBlur={() => { typing.current = false; mineSave.flush() }}
-                /> : <>{!window.yogurt.fake && <OrganizerWorkspace key={`organizer-${id}`} id={id} open={organizerOpen} setOpen={setOrganizerOpen} edited={notes.edited || editedHere} beforeStart={async () => { if (!await saveAll()) return false; setEditedHere(false); return true }} />}<Enhanced key={id} presentation={summaryState} focus={primary === 'notes' && at?.ms === null ? at : undefined} notes={notes} disabled={starting} onChange={(md) => { setEditedHere(true); const next = { ...current.current!, enhanced: md }; current.current = next; setNotes(next); enhancedSave.change(md) }} onBlur={enhancedSave.flush} onRetry={writeAgain} /></>}
+                /> : <>{!window.yogurt.fake && <OrganizerWorkspace key={`organizer-${id}`} id={id} open={organizerOpen} setOpen={setOrganizerOpen} edited={notes.edited || editedHere} beforeStart={async () => { if (!await saveAll()) return false; setEditedHere(false); return true }} />}<NoteVersions id={id} current={notes.enhanced || ''} beforeUse={saveAll} onApplied={() => { void window.yogurt.notes.get(id).then(n => { current.current=n;setNotes(n);setEditedHere(false) }) }}/><Enhanced key={id} presentation={summaryState} focus={primary === 'notes' && at?.ms === null ? at : undefined} notes={notes} disabled={starting} onChange={(md) => { setEditedHere(true); const next = { ...current.current!, enhanced: md }; current.current = next; setNotes(next); enhancedSave.change(md) }} onBlur={enhancedSave.flush} onRetry={writeAgain} /></>}
           </NoteReadingPane>
           {(primary === 'transcript' || transcriptVisited) && <section hidden={primary !== 'transcript'} id="note-transcript-panel" role="tabpanel" aria-labelledby="note-transcript-tab" className="note-content note-transcript-pane">
             <Transcript id={id} recording={recording} active={primary === 'transcript'} inline toolbar={transcriptToolbar} focus={at?.ms != null ? { ...at, ms: at.ms } : undefined} />
@@ -534,10 +535,10 @@ function Enhanced({ notes, presentation, disabled, onChange, onBlur, onRetry, fo
       {(rewriting || handoff) && <SummaryWaiting outline={false} writing={handoff} step={notes.step} part={status === 'writing' ? notes.part : undefined} />}
       <div ref={surface} className="summary-rewrite" data-rewriting={rewriting} data-handoff={handoff} style={handoff ? { minHeight: height.current } : undefined}>
         <div className="summary-result">
-          <Editor focus={focus} testId="note-enhanced-editor" label={t('Summary')} className="enhanced" markdown={writing ? draft : notes.enhanced ?? ''} streaming={writing} editable={!writing && !rewriting && !disabled} onChange={onChange} onBlur={onBlur} />
+          <Editor focus={focus} testId="note-enhanced-editor" label={'정리본'} className="enhanced" markdown={writing ? draft : notes.enhanced ?? ''} streaming={writing} editable={!writing && !rewriting && !disabled} onChange={onChange} onBlur={onBlur} />
         </div>
         {handoff && <div className="summary-previous" aria-hidden="true" inert>
-          <Editor testId="note-enhanced-previous" label={t('Summary')} className="enhanced" markdown={notes.enhanced ?? ''} editable={false} />
+          <Editor testId="note-enhanced-previous" label={'정리본'} className="enhanced" markdown={notes.enhanced ?? ''} editable={false} />
         </div>}
       </div>
       {/* the caret dot and the Summarizing pill show progress; a visible label here would ride the end of the text up and down */}

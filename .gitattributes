@@ -1,0 +1,3 @@
+
+# Preserve byte-for-byte upstream runtime licenses and notices.
+app/resources/licenses/runtime-tools/* -whitespace

@@ -1,3 +1,4 @@
+import { sourceConfigPath } from './localSources'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -12,7 +13,8 @@ export const mcpText = (r: McpResult) => (r.content ?? []).filter(c => c.type ==
 /** Existing official/client configs own their credentials. They are neither displayed nor copied. */
 export function localMcpConfigs(): Record<string, McpConfig> {
   try {
-    const x = JSON.parse(readFileSync(join(os.homedir(), '.claude.json'), 'utf8'))
+    let x: any
+    try { const path=sourceConfigPath(); x=JSON.parse(readFileSync(path || '', 'utf8')) } catch { x=JSON.parse(readFileSync(join(os.homedir(), '.claude.json'), 'utf8')) }
     return Object.fromEntries(Object.entries(x.mcpServers ?? {}).filter(([, v]: [string, any]) => typeof v.command === 'string').map(([k, v]) => [k, v as McpConfig]))
   } catch { return {} }
 }

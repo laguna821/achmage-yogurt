@@ -1,3 +1,7 @@
+import { migrateLegacyProfile } from './profileMigration'
+import { hookNoteVersions } from './noteVersions'
+import { hookImports,importedTranscriptInfo } from './imports'
+import { hookAppearance } from './appearance'
 import { createOrganizerHost } from './organizer/ipc'
 import { matchSearchPeople, searchPersonKey } from '../shared/searchPeople'
 import { resolvePeople } from './people'
@@ -86,9 +90,9 @@ import type { NoteSaveResult, StartResult } from '../shared/types'
 // the transcript's player streams each meeting's audio from here; seeking needs stream support (before ready)
 protocol.registerSchemesAsPrivileged([{ scheme: AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true } }])
 
-app.setName('Yogurt')
+app.setName('Achmage Yogurt')
 // Windows shows notifications only for an app with this id (the installer's shortcut carries the same one, electron-builder appId)
-if (process.platform === 'win32') app.setAppUserModelId('so.yogurt.app')
+if (process.platform === 'win32') app.setAppUserModelId('com.achmage.yogurt')
 app.setPath('userData', userDataDir())
 mkdirSync(userDataDir(), { recursive: true })
 logToFile(join(userDataDir(), 'logs', 'main.log'))
@@ -123,7 +127,7 @@ let sendWidgetTranscript = (_channel: string, _value: unknown) => {}
 function createWindow() {
   win = new BrowserWindow({
     width: 1100, height: 760, minWidth: 720, minHeight: 520,
-    title: 'Yogurt',
+    title: 'Achmage Yogurt',
     ...windowChrome(process.platform, nativeTheme.shouldUseDarkColors),
     show: false,
     // hidden pages would otherwise pause timers and animations
@@ -167,6 +171,7 @@ function createSetup(): SetupController {
   const modelsDir = join(userDataDir(), 'models')
   return new SetupController({
     subscription: !isFake(),
+    selectedAsr: () => loadSettings(join(userDataDir(), 'settings.json')).asrModel,
     modelsDir,
     upgradePreference: {
       load: () => loadSettings(join(userDataDir(), 'settings.json')).notesUpgradeSkipped === true,
@@ -457,9 +462,13 @@ function startDetection() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (!isFake() && !process.env.YOGURT_USER_DATA) {
+    try { await migrateLegacyProfile(join(app.getPath('appData'), 'Yogurt'), userDataDir()) } catch (e) { dialog.showErrorBox('기존 Yogurt 기록 가져오기', String(e)); app.quit(); return }
+  }
   // Local Electron launches need the same Dock icon as the packaged application.
   if (!app.isPackaged && process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
+  if (!isFake() && !existsSync(join(userDataDir(), 'settings.json'))) updateSettings(join(userDataDir(), 'settings.json'), {spoken:'multi',autoUpdate:false})
   const settings = loadSettings(join(userDataDir(), 'settings.json'))
   // a settings file edited by hand can leave no visible entry point: heal it before the window shows
   const visible = visibilityOf(settings)
@@ -505,16 +514,28 @@ app.whenReady().then(() => {
   }
   const setup = createSetup()
   setup.onState((st) => win?.webContents.send('setup:state', st))
+  ipcMain.handle('speech:get', () => ({selected:loadSettings(join(userDataDir(),'settings.json')).asrModel || 'whisper-large-v3-turbo-q5_0',models:bundledCatalog.asr.map(m=>({id:m.id,name:m.name,bytes:m.bytes}))}))
+  ipcMain.handle('speech:select', async (_e, id:unknown) => {
+    if(typeof id!=='string'||!bundledCatalog.asr.some(m=>m.id===id))return {ok:false,message:'전사 모델을 확인하세요.'}
+    if(activeMeeting()||importer.running||organizerHost?.organizer.running)return {ok:false,message:'녹음·전사·정리가 끝난 뒤 모델을 바꾸세요.'}
+    const file=join(userDataDir(),'settings.json'),before=loadSettings(file).asrModel
+    stopTranscriptionServer();updateSettings(file,{asrModel:id})
+    const ok=await setup.changeSpeechModel()
+    if(!ok)updateSettings(file,{asrModel:before})
+    return {ok,message:ok?'전사 모델을 적용했습니다.':'모델을 준비하지 못했습니다. 네트워크와 저장 공간을 확인하세요.'}
+  })
   ipcMain.handle('setup:state', () => setup.state)
   ipcMain.handle('setup:retry', () => setup.retry())
   ipcMain.handle('setup:skip-upgrade', () => setup.skipUpgrade())
   ipcMain.handle('setup:download-upgrade', () => setup.downloadUpgrade())
   const store = openStore(join(userDataDir(), 'yogurt.db'))
+  const versions = hookNoteVersions(store, id => { win?.webContents.send('meetings:changed'); win?.webContents.send('notes:changed', notes.view(id)) })
   storeRef = store
   store.markInterrupted()
   initMeetings(store)
   // the person's own names, never given to the other side: the one in Settings and the Mac's
   const settingsFile = join(userDataDir(), 'settings.json')
+  hookAppearance(settingsFile)
   setCalendarSelection(() => loadSettings(settingsFile))
   const me = () => loadSettings(settingsFile).myName?.trim() || macName()
   setOwnerName(me)
@@ -609,10 +630,11 @@ app.whenReady().then(() => {
     removed: id => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('audio:deleted', id) },
     ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
-  const organizerHost = !isFake() ? createOrganizerHost(userDataDir(), join(process.resourcesPath, 'achmage-transcript'), (id): id is string => isId(id) && !!store.meeting(id), state => win?.webContents.send('organizer:changed', state)) : undefined
+  const organizerHost = !isFake() ? createOrganizerHost(userDataDir(), (existsSync(join(process.resourcesPath, 'achmage-transcript')) ? join(process.resourcesPath, 'achmage-transcript') : join(__dirname, '../../resources/achmage-transcript')), (id): id is string => isId(id) && !!store.meeting(id), state => win?.webContents.send('organizer:changed', state)) : undefined
   const notes = hookNotes({
+    propose: versions.propose,
     manual: !isFake(),
-    ...(organizerHost ? { organize: (id, input, llm, token, signal) => organizerHost.organizer.run(id, input, llm, token, store.meeting(id)!.startedAt, signal), organized: (id, md) => organizerHost.organizer.complete(id, md) } : {}),
+    ...(organizerHost ? { organize: (id, input, llm, token, signal) => organizerHost.organizer.run(id, importedTranscriptInfo(userDataDir(),id)?.timed===false ? {...input,transcript:input.transcript.replace(/^\[[^\]]+\] /gm,'[시간 정보 없음] ')} : input, llm, token, store.meeting(id)!.startedAt, signal), organized: (id, md) => organizerHost.organizer.complete(id, md) } : {}),
     summarized: id => { folderSuggestions.schedule(id); void removeRecording(id, true) },
     // Windows and Linux: a note waiting while the model loads says so (a Mac shows what it always did)
     showLoading: platform !== 'darwin',
@@ -762,6 +784,7 @@ app.whenReady().then(() => {
     if (!meeting || meeting.trashedAt != null || activeMeeting() || resumingId) return
     await joinParts(dir)
   })
+  const importer = hookImports({ root: userDataDir(), store, window: () => win, changed: () => { win?.webContents.send('meetings:changed'); }, available: () => setup.state.phase === 'ready' && !!setup.installed()?.asr && !activeMeeting() && !backfilling, recording: () => !!activeMeeting() || backfilling, transcribe: transcribeRecorded })
   // meetings whose notes a quit or crash cut short: caught up once the models are ready, one at a time
   let caughtUp = false
   // and meetings not in the library yet (or changed since) are indexed, once nothing else is waiting
@@ -777,6 +800,7 @@ app.whenReady().then(() => {
     try {
       await rejoined.catch(() => {})
       for (const m of store.untranscribedMeetings()) {
+        if (importer.list().some(j => j.meetingId === m.id)) continue
         if (activeMeeting()) break
         // the recorder may still be closing its files (the model came in during this very meeting)
         await recordingSettled(m.id)

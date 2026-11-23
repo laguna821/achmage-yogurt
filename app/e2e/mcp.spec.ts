@@ -5,14 +5,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
-const helper = join(import.meta.dirname, '../resources/bin/yogurt-mcp')
+const relay = join(import.meta.dirname, '../resources/mcp-relay.mjs')
 
 const fake = <T>(app: ElectronApplication, fn: string, arg?: unknown): Promise<T> =>
   app.evaluate((_e, [fn, arg]) => (globalThis as unknown as Record<string, Record<string, (a?: unknown) => unknown>>).__fake__[fn as string](arg), [fn, arg] as const) as Promise<T>
 
 /** an AI app: starts yogurt-mcp as Claude would and talks MCP to it, one JSON message a line */
 function aiApp(userData: string) {
-  const child: ChildProcessWithoutNullStreams = spawn(helper, [], { env: { ...process.env, YOGURT_USER_DATA: userData, YOGURT_MCP_NO_LAUNCH: '1' } })
+  const child: ChildProcessWithoutNullStreams = spawn(process.execPath, [relay], { env: { ...process.env, YOGURT_USER_DATA: userData, YOGURT_MCP_NO_LAUNCH: '1' } })
   const replies = new Map<number, unknown>()
   let buf = '', next = 1
   child.stdout.setEncoding('utf8')
@@ -51,9 +51,9 @@ test('an AI app on this Mac reads meetings through yogurt-mcp only once Settings
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByTestId('ai-apps-clients')).toHaveText('Connected apps · Test client')
-    await expect(page.getByTestId('ai-apps-command')).toHaveValue(/yogurt-mcp$/)
+    expect(JSON.parse(await page.getByTestId('ai-apps-command').inputValue()).mcpServers['achmage-yogurt'].env.YOGURT_USER_DATA).toBeTruthy()
     await expect(page.getByTestId('ai-apps-claude')).toHaveCount(0)
-    await expect(page.getByTestId('ai-apps')).toContainText('Copy this command and add it as a local MCP server in your AI app.')
+    await expect(page.getByTestId('ai-apps')).toContainText('설정 JSON')
     await page.evaluate(() => {
       Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: async (text: string) => {
         document.documentElement.dataset.copiedMcp = text
@@ -61,7 +61,7 @@ test('an AI app on this Mac reads meetings through yogurt-mcp only once Settings
     })
     await page.getByTestId('ai-apps-copy').click()
     await expect(page.getByTestId('ai-apps-copy')).toHaveText('Copied')
-    expect(await page.locator('html').getAttribute('data-copied-mcp')).toBe(await page.getByTestId('ai-apps-command').inputValue())
+    expect(JSON.parse((await page.locator('html').getAttribute('data-copied-mcp'))!)).toEqual(JSON.parse(await page.getByTestId('ai-apps-command').inputValue()))
 
     const meetings = JSON.parse((await ai.tool('list_meetings')).text) as Array<{ id: string; title: string }>
     expect(meetings).toHaveLength(2)

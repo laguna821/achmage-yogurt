@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import './workspace.css'
 import './setup.css'
+import './achmage.css'
+import { paletteOf, paletteTokens, type Appearance } from '../../shared/appearance'
 import { App } from './App'
 import { Prompt } from './windows/Prompt'
 import { Widget } from './windows/Widget'
@@ -18,6 +20,8 @@ if (Which === App) installScrollActivity(document)
 // everything re-renders in a newly picked language, in every window at once
 function Page() { useLanguage(); return <Which /> }
 const render = () => createRoot(document.getElementById('root')!).render(<StrictMode><Page /></StrictMode>)
+const applyAppearance = (s: Appearance) => { const root = document.documentElement; root.dataset.skin = s[s.resolved]; root.dataset.mode = s.resolved; root.style.colorScheme = s.resolved; for (const [key, value] of Object.entries(paletteTokens(paletteOf(s[s.resolved], s.resolved)))) root.style.setProperty(key, value) }
+window.yogurt.appearance.onChange(applyAppearance)
 window.yogurt.settings.onLanguage(applyLanguage)
 // the interface language first, so no window flashes English (or the wrong direction)
-window.yogurt.settings.get().then((s) => applyLanguage(s.locale), () => {}).finally(render)
+Promise.all([window.yogurt.settings.get().then((s) => applyLanguage(s.locale), () => {}), window.yogurt.appearance.get().then(applyAppearance, () => {})]).finally(render)

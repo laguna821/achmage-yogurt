@@ -1,0 +1,49 @@
+{
+  "platform": "win32",
+  "arch": "x64",
+  "preparedAt": "2026-11-23T14:15:46.349Z",
+  "upstreamNative": "v0.3.38",
+  "records": [
+    {
+      "name": "Yogurt-windows-x64.exe",
+      "source": "https://github.com/FrigadeHQ/yogurt/releases/download/v0.3.38/Yogurt-windows-x64.exe",
+      "sha256": "068e7134b11f137ad1c7cd78f38ef4d6f2bd76c5aa99ce5f9e22c1a0caceb21a"
+    },
+    {
+      "name": "ffmpeg-win32-x64.gz",
+      "source": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-win32-x64.gz",
+      "sha256": "8883a3dffbd0a16cf4ef95206ea05283f78908dbfb118f73c83f4951dcc06d77"
+    },
+    {
+      "name": "win32-x64.LICENSE",
+      "source": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/win32-x64.LICENSE",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    {
+      "name": "win32-x64.README",
+      "source": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/win32-x64.README",
+      "sha256": "a636a7183c58006351acbaf35303c0ed85c6e1320fd4e80de453ba6157de6311"
+    },
+    {
+      "name": "node",
+      "source": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-x64.zip",
+      "sha256": "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f"
+    },
+    {
+      "name": "yt-dlp.exe",
+      "source": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe",
+      "sha256": "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d"
+    },
+    {
+      "name": "cpython-3.13.18+20261110-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "source": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "2e0fed09d48989f64c9305da9ff2d37a41c0d13ab2aa6283405b2b620dfbf805"
+    },
+    {
+      "name": "codex",
+      "source": "@openai/codex@0.171.0-win32-x64",
+      "integrity": "sha512-HKWBK25tLQxdEg6svw0CrBf+v0bQhRyF8EBVdNqeRxErqpfFa/dfSar6r3sJt6tyPqozOtgz2BH8B2G3n/+gnQ==",
+      "sha256": "cefea4ffee1fff04983a99c0dda99944d8b380e891e740a28b32f4b815a6e0b7"
+    }
+  ]
+}

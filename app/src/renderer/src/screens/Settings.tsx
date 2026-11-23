@@ -1,3 +1,5 @@
+import { SpeechSettings } from '../components/SpeechSettings'
+import { AppearanceSettings } from '../components/AppearanceSettings'
 import { LoadingContent } from '../components/LoadingContent'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, Copy, Download, ExternalLink, Globe, Lock, Upload, FileText } from 'lucide-react'
@@ -76,8 +78,10 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
       <div className="settings-scroll" ref={scroll}>
         <div className="settings-content">
           <h1 data-testid="settings-heading" className="settings-heading">{t('Settings')}</h1>
-          {!window.yogurt.fake && <><nav className="settings-section-tabs" aria-label="설정 종류">{[['general','기본 설정'],['ai','AI 구독·모델'],['sources','자료 연결']].map(([key,label]) => <button key={key} data-testid={`settings-section-${key}`} aria-pressed={section === key} onClick={() => { setSection(key); sessionStorage.setItem('settings-section',key) }}>{label}</button>)}</nav>{section === 'ai' && <SubscriptionSettings />}{section === 'sources' && <SourceConnectionSettings />}</>}
-          <div hidden={!window.yogurt.fake && section !== 'general'}>
+          {<><nav className="settings-section-tabs" aria-label="설정 종류">{[['general','기본 설정'],['ai','AI 구독·모델'],['sources','자료 연결'],['speech','음성 전사'],['appearance','스킨·모양']].filter(([key])=>!window.yogurt.fake || key==='general' || key==='appearance').map(([key,label]) => <button key={key} data-testid={`settings-section-${key}`} aria-pressed={section === key} onClick={() => { setSection(key); sessionStorage.setItem('settings-section',key) }}>{label}</button>)}</nav>{section === 'ai' && <SubscriptionSettings />}{section === 'sources' && <SourceConnectionSettings />}</>}
+          {section === 'speech' && <SpeechSettings />}
+          {section === 'appearance' && <AppearanceSettings />}
+          <div hidden={section !== 'general'}>
 
           <h2 className="settings-section-heading">{t('General')}</h2>
           <div className="settings-group"><LoadingContent pending={!prefs} testId="settings-loading" onReady={() => setGeneralReady(true)}>
@@ -389,7 +393,8 @@ function AiApps() {
     return window.yogurt.mcp.onClients((clients) => setStatus((s) => s && { ...s, clients }))
   }, [])
   const toggle = () => { if (status) { setStatus({ ...status, enabled: !status.enabled }); void window.yogurt.mcp.set(!status.enabled).then(setStatus) } }
-  const copy = () => { if (status) void navigator.clipboard.writeText(status.command).then(() => setCopied(true)) }
+  const config = status ? JSON.stringify({mcpServers:{'achmage-yogurt':{command:status.command,args:status.args??[],env:status.env??{}}}},null,2) : ''
+  const copy = () => { if (status) void navigator.clipboard.writeText(config).then(() => setCopied(true)) }
   const on = !!status?.enabled
   return (
     <>
@@ -407,9 +412,9 @@ function AiApps() {
         {on && status &&
           <div className="settings-row">
             <div className="settings-row-copy">
-              <p className="settings-description">{t('Copy this command and add it as a local MCP server in your AI app.')}</p>
+              <p className="settings-description">{t('Copy this command and add it as a local MCP server in your AI app.')} 명령·인수·프로필이 포함된 설정 JSON입니다.</p>
               <div className="mt-3 flex min-w-0 items-center gap-2 rounded-md border border-line bg-bg p-1.5">
-                <input data-testid="ai-apps-command" aria-label={t('MCP command')} dir="ltr" readOnly value={status.command} className="min-w-0 flex-1 bg-transparent px-2 font-mono text-[12px] text-muted" />
+                <input data-testid="ai-apps-command" aria-label={t('MCP command')} dir="ltr" readOnly value={config} className="min-w-0 flex-1 bg-transparent px-2 font-mono text-[12px] text-muted" />
                 <button data-testid="ai-apps-copy" onClick={copy} className="workspace-button shrink-0">
                   <Swap show={copied ? 'done' : 'copy'} options={{ copy: <Copy size={14} className="text-muted" />, done: <Check size={14} className="text-muted" /> }} /><SwapText text={copied ? t('Copied') : t('Copy')} widest={t('Copied')} />
                 </button>

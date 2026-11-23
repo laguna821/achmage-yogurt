@@ -61,6 +61,14 @@ describe('SetupController', () => {
     expect(hardware).not.toHaveBeenCalled()
     expect(rec.asked).toEqual([turboUrl])
   })
+  it('changes subscription speech weights without downloading a notes model', async () => {
+    let selected=catalog.asr[0].id
+    const {c,rec}=setup({subscription:true,selectedAsr:()=>selected})
+    await c.start();await c.idle();selected=catalog.asr[1].id
+    expect(await c.changeSpeechModel()).toBe(true)
+    expect(c.installed()?.asr).toContain(name(smallUrl));expect(c.notesPath()).toBe('subscription')
+    expect(rec.asked).toEqual([turboUrl,smallUrl])
+  })
   it('goes checking, downloading, ready; the fraction only goes up and ends at 1', async () => {
     const { c, states } = setup()
     expect(c.state.phase).toBe('checking')

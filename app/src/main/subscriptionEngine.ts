@@ -1,6 +1,6 @@
 import { spawn, execFile } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, delimiter } from 'node:path'
 import os from 'node:os'
 import type { Engine, ChatRequest } from './engine'
 import type { EngineMessage } from '../shared/engine-protocol'
@@ -13,17 +13,19 @@ const SYSTEM = 'You are the text-only meeting assistant inside Yogurt. Follow th
 export function subscriptionEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env }
   for (const k of Object.keys(env)) if (/^(ANTHROPIC_|OPENAI_|CODEX_API_KEY$|CLAUDE_CODE_USE_|ELECTRON_|APPIMAGE|APPDIR$|LD_LIBRARY_PATH$|CLAUDECODE$)/.test(k)) delete env[k]
-  env.PATH = [join(os.homedir(), '.local/bin'), join(os.homedir(), '.config/orca/codex-connection/bin'), env.PATH ?? '', '/usr/bin', '/bin'].join(':')
+  env.PATH = [join(process.resourcesPath || '', 'tools'), join(os.homedir(), '.local/bin'), join(os.homedir(), '.config/orca/codex-connection/bin'), env.PATH ?? '', ...(process.platform === 'win32' ? [] : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'])].join(delimiter)
   return env
 }
 
 export function subscriptionCli(name: 'claude' | 'codex'): string {
+  const bundled = join(process.resourcesPath || '', 'tools', name + (process.platform === 'win32' ? '.exe' : ''))
+  if (existsSync(bundled)) return bundled
   const pinned = join(os.homedir(), '.local/opt/yogurt/tools/codex-0.171.0/node_modules/.bin/codex')
   if (name === 'codex' && existsSync(pinned)) return pinned
   // Prefer the current official desktop engine to an older standalone PATH installation.
   if (name === 'codex' && existsSync('/usr/lib/chatgpt/resources/codex')) return '/usr/lib/chatgpt/resources/codex'
-  for (const d of (subscriptionEnv().PATH ?? '').split(':')) {
-    const p = join(d, name)
+  for (const d of (subscriptionEnv().PATH ?? '').split(delimiter)) {
+    const p = join(d, name + (process.platform === 'win32' ? '.exe' : ''))
     if (existsSync(p)) return p
   }
   return name

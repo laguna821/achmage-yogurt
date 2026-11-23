@@ -11,10 +11,10 @@ it('Windows starts Yogurt at login with --hidden: in the tray, no window, like a
 })
 
 it('Linux: an XDG autostart entry that starts the AppImage hidden, quoted for any path', () => {
-  expect(autostartFile({ XDG_CONFIG_HOME: '/cfg' }, '/home/sam')).toBe('/cfg/autostart/yogurt.desktop')
-  expect(autostartFile({}, '/home/sam')).toBe('/home/sam/.config/autostart/yogurt.desktop')
+  expect(autostartFile({ XDG_CONFIG_HOME: '/cfg' }, '/home/sam')).toBe('/cfg/autostart/achmage-yogurt.desktop')
+  expect(autostartFile({}, '/home/sam')).toBe('/home/sam/.config/autostart/achmage-yogurt.desktop')
   const entry = autostartEntry('/home/sam/My Apps/Yogurt 100%.AppImage')
-  expect(entry).toContain('[Desktop Entry]\nType=Application\nName=Yogurt\n')
+  expect(entry).toContain('[Desktop Entry]\nType=Application\nName=Achmage Yogurt\n')
   expect(entry).toContain('Exec="/home/sam/My Apps/Yogurt 100%%.AppImage" --hidden\n')
   expect(autostartEntry('/a/$x"y.AppImage')).toContain('Exec="/a/\\\\$x\\\\"y.AppImage" --hidden\n')
 })

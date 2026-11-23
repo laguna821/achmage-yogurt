@@ -30,7 +30,7 @@ export function SubscriptionSettings() {
     finally { setBusy(false) }
   }
   return <section data-testid="subscription-settings">
-    <h2 className="settings-section-heading">AI 구독 및 모델</h2>
+    <h2 className="settings-section-heading">AI 구독 및 모델</h2><div className="skin-controls"><button disabled={busy} onClick={async()=>{setBusy(true);try{const r=await window.yogurt.subscription.connect();setMessage(r.message);setFailed(!r.ok)}catch(e){setMessage(String(e));setFailed(true)}finally{setBusy(false)}}}>ChatGPT 로그인</button><button onClick={()=>void reload()}>연결 새로고침</button></div>
     <div className="settings-group">
       <div className="settings-row"><div className="settings-row-copy">
         <p className="settings-label">정리 · 질문 답변의 기본 AI</p>

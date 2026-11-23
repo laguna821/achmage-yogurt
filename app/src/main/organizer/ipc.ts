@@ -1,3 +1,5 @@
+import { setSourceProfile,localVaultPath } from './localSources'
+import { updateSettings } from '../settings'
 import { ipcMain, dialog, clipboard, safeStorage, shell } from 'electron'
 import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
@@ -8,6 +10,10 @@ import { importMaterial } from './runtime'
 import type { OrganizerOptions, OrganizerContext } from '../../shared/organizer'
 
 export function createOrganizerHost(profile: string, skillDir: string, known: (id: unknown) => id is string, changed: ConstructorParameters<typeof Organizer>[2]) {
+  setSourceProfile(profile)
+  ipcMain.handle('sources:vault', () => localVaultPath() || '')
+  ipcMain.handle('sources:choose-vault', async () => { const r = await dialog.showOpenDialog({title:'맥락 자료를 찾을 볼트 폴더',properties:['openDirectory']}); if (!r.canceled) updateSettings(join(profile,'settings.json'),{vaultPath:r.filePaths[0]}); return localVaultPath() || '' })
+  ipcMain.handle('sources:clear-vault', () => { updateSettings(join(profile,'settings.json'),{vaultPath:undefined}); return '' })
   const gmail = new GmailConnector(join(profile, 'gmail'), {
     encode: text => safeStorage.isEncryptionAvailable() ? Buffer.concat([Buffer.from([1]), safeStorage.encryptString(text)]) : Buffer.concat([Buffer.from([0]), Buffer.from(text)]),
     decode: bytes => bytes[0] === 1 ? safeStorage.decryptString(bytes.subarray(1)) : bytes.subarray(1).toString(),

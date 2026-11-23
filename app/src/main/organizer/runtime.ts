@@ -2,6 +2,10 @@ import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, statSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { extractRawText } from 'mammoth'
+import { simpleParser } from 'mailparser'
+import { mediaTool } from '../imports/tools'
 import pinned from '../../../resources/achmage-transcript/manifest.json'
 import type { Evidence } from '../../shared/organizer'
 
@@ -18,19 +22,15 @@ export async function importMaterial(path: string, id: string, signal?: AbortSig
   if (statSync(path).size > 20_000_000) throw new Error('자료 한 개는 20MB까지 첨부할 수 있습니다.')
   if (['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(ext)) return { id, provider: 'attached', title: basename(path), locator: path, text: '첨부 이미지 · 정리 시작 후 선택한 모델로 읽습니다.', revision: createHash('sha256').update(readFileSync(path)).digest('hex'), issueIds: [], imagePath: path }
   let text: string
-  if (ext === '.pdf') { const result = await exec('pdftotext', ['-layout', path, '-'], signal); if (result.code) throw new Error('PDF 텍스트를 읽지 못했습니다. 암호나 파일 형식을 확인하세요.'); text = result.text }
-  else if (ext === '.docx') { const result = await exec('python3', ['-c', 'import sys,zipfile,xml.etree.ElementTree as E; z=zipfile.ZipFile(sys.argv[1]); i=z.getinfo("word/document.xml"); assert i.file_size<20000000; r=E.fromstring(z.read(i)); print("\\n".join("".join(p.itertext()) for p in r.iter() if p.tag.endswith("}p")))', path], signal); if (result.code) throw new Error('Word 자료를 읽지 못했습니다.'); text = result.text }
-  else if (ext === '.eml') {
-    const result = await exec('python3', ['-c', `import sys, email.policy, email.parser, re, html
-m=email.parser.BytesParser(policy=email.policy.default).parsebytes(open(sys.argv[1],'rb').read())
-print('\\n'.join(k+': '+str(m.get(k,'')) for k in ['Subject','From','To','Date']))
-p=m.get_body(preferencelist=('plain','html'))
-if p:
- s=p.get_content()
- print(html.unescape(re.sub('<[^>]+>',' ',s)) if p.get_content_subtype()=='html' else s)
-`, path], signal)
-    if (result.code) throw new Error('이메일 자료를 읽지 못했습니다.'); text = result.text
+  if (ext === '.pdf') {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    const worker = join(process.resourcesPath || '', 'pdf/pdf.worker.mjs')
+    if (existsSync(worker)) pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(worker).href
+    const task = pdfjs.getDocument({ data: new Uint8Array(readFileSync(path)), useSystemFonts: true, disableFontFace: true }); const doc = await task.promise
+    try { const pages: string[] = []; for (let n = 1; n <= doc.numPages; n++) { if (signal?.aborted) throw new Error('Stopped'); const content = await (await doc.getPage(n)).getTextContent(); pages.push(content.items.map(i => 'str' in i ? i.str : '').join(' ')); if (pages.join('').length > 500000) throw new Error('PDF 추출 텍스트가 너무 큽니다.') }; text = pages.join('\n\n') } finally { await task.destroy() }
   }
+  else if (ext === '.docx') text = (await extractRawText({ path })).value
+  else if (ext === '.eml') { const email = await simpleParser(readFileSync(path)); text = `제목: ${email.subject || ''}\n발신: ${email.from?.text || ''}\n일시: ${email.date?.toISOString() || ''}\n${email.text || ''}` }
   else { const bytes = readFileSync(path); text = bytes.toString('utf8'); if (text.includes('�')) text = new TextDecoder('euc-kr').decode(bytes); text = text.replace(/^\uFEFF/, '') }
   if (Buffer.byteLength(text) > 500_000) throw new Error('자료 한 개의 추출 텍스트는 500KB까지 사용할 수 있습니다.')
   if (!text.trim()) throw new Error('자료에서 텍스트를 읽지 못했습니다. 스캔 PDF는 텍스트 자료로 첨부하세요.')
@@ -40,7 +40,8 @@ if p:
 /** Pinned owner-authored skill scripts are shipped as ordinary resources, outside app.asar. */
 export class TranscriptRuntime {
   constructor(private skillDir: string) {}
-  private run(args: string[], signal?: AbortSignal) { return exec('python3', [join(this.skillDir, 'scripts/transcript.py'), ...args], signal) }
+  private run(args: string[], signal?: AbortSignal) { return exec(this.python(), [join(this.skillDir, 'scripts/transcript.py'), ...args], signal) }
+  private python() { const p = join(process.resourcesPath || '', 'python', process.platform === 'win32' ? 'python.exe' : 'bin/python3'); return existsSync(p) ? p : process.platform === 'win32' ? 'python' : 'python3' }
   available() { try { return createHash('sha256').update(readFileSync(join(this.skillDir, 'scripts/transcript.py'))).digest('hex') === pinned.files['scripts/transcript.py'] } catch { return false } }
   async prepare(work: string, transcript: string, glossary: string[], signal?: AbortSignal) {
     mkdirSync(work, { recursive: true })
