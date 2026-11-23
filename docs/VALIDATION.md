@@ -31,3 +31,5 @@ Mac Intel·DMG, iOS/웹 앱, 새 ASR 엔진, 스캔 PDF OCR, 카카오톡 직접
 스킨 원본 확인: `research:rr-d6d36b3f5f7a4c32ef411d896421c2c5:7e6679d65940ca823ae22602a067c61f6cac5082fe94f816e977bf02ff3a34ec`.
 
 구현 실험/실패와 변경 조건: `research:rr-40897beb2cff7919fe9cccb902fc3795:13c8bda82591bc926edb0aa07e76bdc82a12ef380a2e544f00c28717004b46d9`. 후속 최종 리비전은 작업 인계 문서에 연결합니다. 과거 실패 기록을 삭제하거나 완료로 덮어쓰지 않았습니다.
+
+최종 구현·배포 확인 리비전: `research:rr-40897beb2cff7919fe9cccb902fc3795:fb3630e52ba2465d2fc61f3dce399308ccbbaea9f3a3c136f097f0ed8a0412e3`. 이전 실패의 변경 조건과 최종 통과, 미검증 범위를 함께 보존합니다.
