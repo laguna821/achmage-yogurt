@@ -6,7 +6,8 @@ import { basename,extname,join } from 'node:path'
 import type { Store } from '../store'
 import { importMaterial } from '../organizer/runtime'
 import { MEDIA_EXTS,TRANSCRIPT_EXTS,parseTranscript,youtubeUrl,type ImportFile,type ImportJob,type ImportRequest,type ImportStage } from '../../shared/imports'
-import { command,ffmpegDecode,mediaTool,mediaNode } from './tools'
+import { command,ffmpegDecode,mediaTool } from './tools'
+import { downloadYouTube, youtubeImportError } from './youtube'
 
 const errorText=(e:unknown)=>e instanceof Error?e.message:String(e)
 const hashFile=(file:string)=>new Promise<string>((resolve,reject)=>{const h=createHash('sha256'),r=createReadStream(file);r.on('data',b=>h.update(b));r.on('error',reject);r.on('end',()=>resolve(h.digest('hex')))})
@@ -29,6 +30,7 @@ export class ImportManager {
     mkdirSync(this.jobDir(),{recursive:true})
     for(const name of readdirSync(this.jobDir()).filter(n=>n.endsWith('.json'))){try{const j=JSON.parse(readFileSync(join(this.jobDir(),name),'utf8')) as ImportJob
       if(!/^[a-f0-9-]{36}$/.test(j.id))continue
+      if(j.stage==='failed' && j.url && /429|too many requests/i.test(j.message))j.errorDetail=j.message
       if(!['done','failed','cancelled','waiting','interrupted'].includes(j.stage)){j.stage='interrupted';j.message='앱이 종료되어 중단됐습니다. 원본을 보존했습니다. 다시 시작할 수 있습니다.'}
       this.jobs.set(j.id,j)
     }catch{/* A damaged job never affects the meeting database. */}}
@@ -54,7 +56,7 @@ export class ImportManager {
     if(this.current||this.d.recording())return
     const j=[...this.jobs.values()].find(j=>j.stage==='queued'||j.stage==='waiting'&&this.d.available());if(!j)return
     const abort=new AbortController();this.current={id:j.id,abort}
-    try{await this.run(j,abort.signal)}catch(e){this.save(j,abort.signal.aborted?'cancelled':'failed',errorText(e).slice(0,1000))}finally{this.current=undefined;this.kick()}
+    try{await this.run(j,abort.signal)}catch(e){j.errorDetail=errorText(e).slice(0,2000);this.save(j,abort.signal.aborted?'cancelled':'failed',j.url&&!abort.signal.aborted?youtubeImportError(j.errorDetail):j.errorDetail.slice(0,1000))}finally{this.current=undefined;this.kick()}
   }
   private async run(j:ImportJob,signal:AbortSignal){
     const meeting=j.meetingId?this.d.store.meeting(j.meetingId):undefined
@@ -72,18 +74,15 @@ export class ImportManager {
     let audio=j.files.findIndex(f=>f.kind==='media')>=0?originals[j.files.findIndex(f=>f.kind==='media')]:undefined
     let transcript=j.files.findIndex(f=>f.kind==='transcript')>=0?originals[j.files.findIndex(f=>f.kind==='transcript')]:undefined
     if(j.url){
-      const base=join(original,'youtube'),info=base+'.info.json'
-      const common=['--ignore-config','--no-playlist','--no-warnings','--socket-timeout','30','--retries','2','--ffmpeg-location',mediaTool('ffmpeg'),'--js-runtimes',`node:${mediaNode()}`,'--write-info-json','-o',base+'.%(ext)s']
-      const haveDownload=readdirSync(original).some(n=>j.caption?n.endsWith('.vtt'):n.startsWith('youtube.')&&MEDIA_EXTS.includes(extname(n).slice(1)))
-      if(!existsSync(info)||!haveDownload){
-        this.save(j,'downloading','YouTube 영상 정보와 '+(j.caption?'기존 자막':'오디오')+'를 가져오고 있습니다.')
-        await command(mediaTool('yt-dlp'),[...common,...(j.caption?['--skip-download','--write-subs','--write-auto-subs','--sub-langs','ko.*,en.*','--sub-format','vtt']:['-f','bestaudio/best']),j.url],signal,undefined,{ELECTRON_RUN_AS_NODE:'1'})
-      }
-      const data=JSON.parse(readFileSync(info,'utf8'));j.title=String(data.title||j.title).slice(0,200)
-      this.d.store.updateMeeting(id,{title:j.title})
-      if(j.caption){transcript=readdirSync(original).filter(n=>/\.vtt$/.test(n)).sort((a,b)=>Number(!a.includes('.ko'))-Number(!b.includes('.ko'))).map(n=>join(original,n))[0];if(!transcript)throw new Error('가져올 한국어/영어 자막이 없습니다. 새 작업에서 오디오 전사를 선택하세요.')}
-      else audio=readdirSync(original).filter(n=>n.startsWith('youtube.')&&MEDIA_EXTS.includes(extname(n).slice(1))).map(n=>join(original,n))[0]
-      if(!audio&&!transcript)throw new Error('다운로드 파일이 없습니다. 원본을 보존했습니다. 새 작업으로 다시 가져오세요.')
+      // Older failed jobs also skip the already rate-limited caption endpoint on retry.
+      if(j.caption && /429|too many requests/i.test(j.errorDetail || j.captionFallback || ''))j.captionFallback ||= 'YouTube 자막 요청 제한(429): 음성 전사로 전환합니다.'
+      const downloaded=await downloadYouTube({directory:original,url:j.url,captions:!!j.caption,skipCaptions:!!j.captionFallback,signal,
+        onInfo:data=>{j.title=String(data.title||j.title).slice(0,200);this.d.store.updateMeeting(id,{title:j.title})},
+        onProgress:message=>this.save(j,'downloading',message),
+        onFallback:(message,detail)=>{j.captionFallback=message;j.errorDetail=detail;this.save(j,'downloading',message)}
+      })
+      audio=downloaded.audio;transcript=downloaded.transcript
+      j.transcriptSource=transcript?'youtube-captions':'local-asr';j.captionLanguage=downloaded.track?.language;j.captionAutomatic=downloaded.track?.automatic
       for(const path of [audio,transcript].filter((p):p is string=>!!p))if(!j.assets.some(a=>a.name===basename(path)))j.assets.push({name:basename(path),bytes:statSync(path).size,sha256:await hashFile(path)})
     }
     let duration=0
@@ -119,12 +118,13 @@ export class ImportManager {
       const done=await this.d.transcribe(id,{them:ffmpegDecode(join(dir,'them.ogg'),signal)},()=>signal.aborted||this.d.recording())
       if(signal.aborted)throw new Error('전사를 중단했습니다. 완료된 구간은 보존했습니다.')
       if(!done||this.d.store.meeting(id)?.transcriptionPending){this.save(j,'interrupted','전사가 중단됐습니다. 원본과 부분 전사를 보존했습니다. 다시 시작하면 부분 전사를 별도 보관하고 전체를 전사합니다.');return}
+      if(!this.d.store.segments(id).some(s=>s.text.trim()))throw new Error('음성은 저장됐지만 인식된 발화가 없습니다. 선택 구간과 오디오를 확인한 뒤 다시 시작하세요.')
     }
     if(signal.aborted)throw new Error('작업을 중단했습니다.')
-    writeFileSync(join(dir,'import-source.json'),JSON.stringify({url:j.url,caption:!!j.caption,start:j.start,end:j.end,assets:j.assets,importedAt:j.createdAt},null,2),{mode:0o600})
+    writeFileSync(join(dir,'import-source.json'),JSON.stringify({url:j.url,caption:!!j.caption,transcriptSource:j.transcriptSource,captionLanguage:j.captionLanguage,captionAutomatic:j.captionAutomatic,captionFallback:j.captionFallback,start:j.start,end:j.end,assets:j.assets,importedAt:j.createdAt},null,2),{mode:0o600})
     j.durationMs=Math.round(duration)
     this.d.store.updateMeeting(id,{durationMs:j.durationMs,endedAt:(this.d.store.meeting(id)?.startedAt||Date.now())+j.durationMs})
-    this.save(j,'done',transcript?'기존 전사를 가져왔습니다. 기록을 열어 맥락 자료를 넣고 정리를 시작하세요.':'전사가 끝났습니다. 기록을 열어 맥락 자료를 넣고 정리를 시작하세요.')
+    this.save(j,'done',transcript?'기존 전사를 가져왔습니다. 기록을 열어 맥락 자료를 넣고 정리를 시작하세요.':j.captionFallback?'자막을 가져오지 못해 로컬 음성 전사를 완료했습니다. 기록을 열어 정리를 시작하세요.':'전사가 끝났습니다. 기록을 열어 맥락 자료를 넣고 정리를 시작하세요.')
   }
 }
 export function hookImports(d:Deps){

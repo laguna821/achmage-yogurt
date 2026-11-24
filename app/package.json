@@ -1,6 +1,6 @@
 {
   "name": "@yogurt/app",
-  "version": "0.4.0-achmage.1",
+  "version": "0.4.0-achmage.2",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",

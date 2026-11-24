@@ -87,3 +87,5 @@ html[data-skin] :focus-visible { outline-color:var(--focus); }
 
 [data-untimed] time { display:none; }
 .import-timing-notice { padding:8px 16px; color:var(--muted); font-size:12px; }
+
+.import-progress [data-stage="failed"] span { color:var(--danger); }

@@ -1,6 +1,6 @@
 # 개발·서명 없는 배포
 
-Node 24와 pnpm 10.7.0을 사용합니다. 원래 MIT 저작권 고지를 유지합니다. 현재 앱 버전은 `0.4.0-achmage.1`입니다.
+Node 24와 pnpm 10.7.0을 사용합니다. 원래 MIT 저작권 고지를 유지합니다. 현재 소스와 이 컴퓨터의 Linux 설치 버전은 `0.4.0-achmage.2`입니다. GitHub의 기존 Windows/macOS/Linux 사전 릴리스는 `0.4.0-achmage.1`이며, 이번 YouTube 오류 수정으로 원격 설치본을 다시 배포하지 않았습니다.
 
 ```sh
 pnpm install --frozen-lockfile
