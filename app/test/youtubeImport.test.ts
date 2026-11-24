@@ -106,3 +106,19 @@ describe('YouTube captions and audio are independent acquisition paths', () => {
     expect(transcribe).toHaveBeenCalledOnce()
   })
 })
+
+it('persists video identity and meeting linkage before the first failing network request',async()=>{
+ const root=temp(),store=new Store(join(root,'test.db'));stores.push(store)
+ vi.mocked(command).mockImplementation(async()=>{
+   const saved=JSON.parse(readFileSync(join(root,'imports',manager.list()[0].id+'.json'),'utf8'))
+   expect(saved.meetingId).toBeTruthy()
+   const source=JSON.parse(readFileSync(join(root,'meetings',saved.meetingId,'import-source.json'),'utf8'))
+   expect(source.url).toBe('https://www.youtube.com/watch?v=abcdefghijk')
+   expect(source.transcriptSource).toBeUndefined()
+   throw Error('Network unavailable')
+ })
+ const manager=new ImportManager({root,store,window:()=>undefined,changed:()=>{},available:()=>true,recording:()=>false,transcribe:vi.fn()})
+ manager.add({url:'https://youtu.be/abcdefghijk'})
+ await vi.waitFor(()=>expect(manager.list()[0].stage).toBe('failed'))
+ expect(command).toHaveBeenCalledOnce()
+})

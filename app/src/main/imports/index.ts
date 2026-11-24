@@ -64,6 +64,9 @@ export class ImportManager {
     if(j.meetingId&&!meeting)throw new Error('가져온 기록이 삭제됐습니다. 새 작업으로 가져오세요.')
     if(!j.meetingId){const now=Date.now(),m=this.d.store.createMeeting({title:j.title,titleSource:'user',startedAt:now,endedAt:now,state:'stopped',eventId:null,app:null,attendees:[],language:'korean'});j.meetingId=m.id}
     const id=j.meetingId,dir=join(this.d.root,'meetings',id),original=join(dir,'original');mkdirSync(original,{recursive:true})
+    // Persist identity before the first network/model step, including failed or interrupted imports.
+    const saveSource=()=>{const path=join(dir,'import-source.json');writeFileSync(path+'.tmp',JSON.stringify({jobId:j.id,url:j.url,video:j.video,caption:!!j.caption,transcriptSource:j.transcriptSource,captionLanguage:j.captionLanguage,captionAutomatic:j.captionAutomatic,captionFallback:j.captionFallback,start:j.start,end:j.end,assets:j.assets,importedAt:j.createdAt},null,2),{mode:0o600});renameSync(path+'.tmp',path)}
+    saveSource();this.save(j,j.url?'downloading':'copying',j.url?'YouTube 원본을 준비하고 있습니다.':'원본 자료를 준비하고 있습니다.')
     const originals:string[]=[];j.assets??=[]
     for(const [n,file]of j.files.entries()){
       if(signal.aborted)throw new Error('작업을 중단했습니다.')
@@ -122,7 +125,7 @@ export class ImportManager {
       if(!this.d.store.segments(id).some(s=>s.text.trim()))throw new Error('음성은 저장됐지만 인식된 발화가 없습니다. 선택 구간과 오디오를 확인한 뒤 다시 시작하세요.')
     }
     if(signal.aborted)throw new Error('작업을 중단했습니다.')
-    writeFileSync(join(dir,'import-source.json'),JSON.stringify({url:j.url,caption:!!j.caption,transcriptSource:j.transcriptSource,captionLanguage:j.captionLanguage,captionAutomatic:j.captionAutomatic,captionFallback:j.captionFallback,start:j.start,end:j.end,assets:j.assets,importedAt:j.createdAt},null,2),{mode:0o600})
+    saveSource()
     j.durationMs=Math.round(duration)
     this.d.store.updateMeeting(id,{durationMs:j.durationMs,endedAt:(this.d.store.meeting(id)?.startedAt||Date.now())+j.durationMs})
     if(!j.captionFallback)delete j.errorDetail

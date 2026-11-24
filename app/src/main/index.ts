@@ -1,6 +1,7 @@
 import { migrateLegacyProfile } from './profileMigration'
 import { hookNoteVersions } from './noteVersions'
-import { hookImports,importedTranscriptInfo } from './imports'
+import { hookImports,importedTranscriptInfo, type ImportManager } from './imports'
+import { VideoSources } from './imports/sources'
 import { createVideoHost, VIDEO_SCHEME } from './video/ipc'
 import { suppliedLinks, vaultEvidence, mailEvidence } from './organizer/evidence'
 import { hookAppearance } from './appearance'
@@ -519,7 +520,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('speech:get', () => ({selected:loadSettings(join(userDataDir(),'settings.json')).asrModel || 'whisper-large-v3-turbo-q5_0',models:bundledCatalog.asr.map(m=>({id:m.id,name:m.name,bytes:m.bytes}))}))
   ipcMain.handle('speech:select', async (_e, id:unknown) => {
     if(typeof id!=='string'||!bundledCatalog.asr.some(m=>m.id===id))return {ok:false,message:'전사 모델을 확인하세요.'}
-    if(activeMeeting()||importer.running||organizerHost?.organizer.running)return {ok:false,message:'녹음·전사·정리가 끝난 뒤 모델을 바꾸세요.'}
+    if(activeMeeting()||importer?.running||organizerHost?.organizer.running)return {ok:false,message:'녹음·전사·정리가 끝난 뒤 모델을 바꾸세요.'}
     const file=join(userDataDir(),'settings.json'),before=loadSettings(file).asrModel
     stopTranscriptionServer();updateSettings(file,{asrModel:id})
     const ok=await setup.changeSpeechModel()
@@ -633,6 +634,8 @@ app.whenReady().then(async () => {
     ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
   const organizerHost = !isFake() ? createOrganizerHost(userDataDir(), (existsSync(join(process.resourcesPath, 'achmage-transcript')) ? join(process.resourcesPath, 'achmage-transcript') : join(__dirname, '../../resources/achmage-transcript')), (id): id is string => isId(id) && !!store.meeting(id), state => win?.webContents.send('organizer:changed', state)) : undefined
+  let importer: ImportManager | undefined
+  const videoSources = new VideoSources(userDataDir(), () => importer?.list())
   let videoHost: ReturnType<typeof createVideoHost> | undefined
   const notes = hookNotes({
     propose: versions.propose,
@@ -648,7 +651,7 @@ app.whenReady().then(async () => {
     // the notes are written: the meeting goes into the library for chat across meetings
     changed: () => { win?.webContents.send('meetings:changed'); void indexer.schedule() },
   })
-  videoHost = createVideoHost({root:userDataDir(),store,queue,model,propose:versions.propose,
+  videoHost = createVideoHost({sources:videoSources,root:userDataDir(),store,queue,model,propose:versions.propose,
     modelKey:()=>`${subscriptionModel(loadSettings(settingsFile).aiModel)} · ${reasoningEffort(loadSettings(settingsFile).aiReasoningEffort)}`,
     changed:state=>win?.webContents.send('video:changed',state),
     notesChanged:id=>{win?.webContents.send('notes:changed',notes.view(id));win?.webContents.send('meetings:changed');void indexer.schedule()},
@@ -803,7 +806,7 @@ app.whenReady().then(async () => {
     if (!meeting || meeting.trashedAt != null || activeMeeting() || resumingId) return
     await joinParts(dir)
   })
-  const importer = hookImports({ completed:(id,options)=>{if(options&&options.depth!=='transcript')try{videoHost?.start(id,options)}catch(e){console.error('영상 정리 등록 실패',e)}}, root: userDataDir(), store, window: () => win, changed: () => { win?.webContents.send('meetings:changed'); }, available: () => setup.state.phase === 'ready' && !!setup.installed()?.asr && !activeMeeting() && !backfilling, recording: () => !!activeMeeting() || backfilling, transcribe: transcribeRecorded })
+  importer = hookImports({ completed:(id,options)=>{if(options&&options.depth!=='transcript')try{videoHost?.start(id,options)}catch(e){console.error('영상 정리 등록 실패',e)}}, root: userDataDir(), store, window: () => win, changed: () => { win?.webContents.send('meetings:changed'); }, available: () => setup.state.phase === 'ready' && !!setup.installed()?.asr && !activeMeeting() && !backfilling, recording: () => !!activeMeeting() || backfilling, transcribe: transcribeRecorded })
   // meetings whose notes a quit or crash cut short: caught up once the models are ready, one at a time
   let caughtUp = false
   // and meetings not in the library yet (or changed since) are indexed, once nothing else is waiting
@@ -991,11 +994,12 @@ app.whenReady().then(async () => {
     } catch (e) { console.warn('tidying prepared notes failed', e) }
   }
   tidyPrepared(); setInterval(tidyPrepared, 60_000).unref()
-  ipcMain.handle('meetings:cards', (_e, o: { before?: { at: number; id: string }; limit?: number; folder?: string }) => {
+  ipcMain.handle('meetings:cards', (_e, o: { before?: { at: number; id: string }; limit?: number; folder?: string; category?: 'video' | 'recording' }) => {
     const limit = Math.max(1, Math.min(1000, Number(o?.limit) || 40))
     const b = o?.before
-    return store.meetingCards({ limit, before: b && typeof b.at === 'number' && typeof b.id === 'string' ? b : undefined, ...(isId(o?.folder) ? { folder: o.folder } : {}) })
-      .map((m) => ({ ...withStopState(m), ...(recordingPaused(m.id) ? { paused: true } : {}) }))
+    const videoIds = videoSources.ids()
+    return store.meetingCards({ ...(o?.category === 'video' || o?.category === 'recording' ? { idsFilter: { ids: videoIds, exclude: o.category === 'recording' } } : {}), limit, before: b && typeof b.at === 'number' && typeof b.id === 'string' ? b : undefined, ...(isId(o?.folder) ? { folder: o.folder } : {}) })
+      .map((m) => ({ ...withStopState(m), category: videoIds.includes(m.id) ? 'video' : 'recording', ...(recordingPaused(m.id) ? { paused: true } : {}) }))
   })
   const calendarList = async () => {
     const list = await calendars(), settings = loadSettings(settingsFile), hidden = settings.hiddenCalendarIds ?? []

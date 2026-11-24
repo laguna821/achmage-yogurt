@@ -2,7 +2,7 @@ import { toasts } from './TrashToast'
 import { askDestination } from '../../../shared/askContext'
 import * as Sidebar from '@animate-ui/react/primitives/sidebar'
 import { useEffect, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Mic, FileVideoCamera } from 'lucide-react'
 import type { MeetingView, Folder, WidgetView } from '../../../shared/types'
 import { t } from '../../../shared/i18n'
 import { command, keys, onMac } from '../keys'
@@ -29,6 +29,16 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
   }, [])
   const sidebarTransition = { duration: sidebarMotion ? 0.2 : 0, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] }
   const note = route.startsWith('/note/')
+  const [noteCategory, setNoteCategory] = useState<'video' | 'recording'>()
+  useEffect(() => {
+    setNoteCategory(undefined)
+    if (!route.startsWith('/note/')) return
+    let active = true
+    const refresh = () => { void window.yogurt.video.get(route.slice(6)).then(s => { if (active) setNoteCategory(s ? 'video' : 'recording') }).catch(() => {}) }
+    refresh()
+    const off = window.yogurt.imports.onChange(refresh)
+    return () => { active = false; off() }
+  }, [route])
   // a saved chat (/chat/<id>) is still under Chat
   const section = route.startsWith('/settings/') ? '/settings' : route.startsWith('/chat/') ? '/chat' : route
   const returnToRecording = recording?.kind === 'recording' && route !== `/note/${recording.meetingId}`
@@ -54,16 +64,18 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
     return () => { off(); window.removeEventListener('keydown', key) }
   }, [route, go])
   const links = [
-    { route: '', label: t('Meetings'), Icon: FileText },
+    { route: '', label: '전체 기록', Icon: FileText },
+    { route: '/recordings', label: '녹음·전사', Icon: Mic },
+    { route: '/videos', label: 'YouTube 영상', Icon: FileVideoCamera },
     { route: '/chat', label: t('Ask'), Icon: MessageCircle },
     { route: '/trash', label: t('Trash'), Icon: Trash2 },
     { route: '/settings', label: t('Settings'), Icon: Settings },
   ]
   const folder = route.startsWith('/folder/') ? folders?.find((s) => route === `/folder/${s.id}`) : undefined
   const current = links.find((link) => link.route === section) ?? (route.startsWith('/folder/') ? { label: folder?.name ?? t('Folder') } : undefined)
-  const label = note ? (meeting && route === `/note/${meeting.id}` ? meeting.title : t('Meeting')) : route.startsWith('/settings') ? t('Settings') : current?.label ?? t('Meetings')
-  const nav = (link: typeof links[number]) => <button key={link.route} data-testid={link.route === '' ? 'nav-home' : link.route === '/chat' ? 'nav-chat' : link.route === '/settings' ? 'settings-open' : 'nav-trash'}
-    data-sidebar="menu-button" aria-label={link.label} title={collapsed ? link.label : undefined} className={`workspace-nav${link.route === '/trash' ? ' workspace-trash' : ''}`} aria-current={section === link.route || link.route === '' && route === '/meetings' ? 'page' : undefined} onClick={() => go(link.route)}>
+  const label = note ? (meeting && route === `/note/${meeting.id}` ? meeting.title : t('Meeting')) : route.startsWith('/settings') ? t('Settings') : current?.label ?? '전체 기록'
+  const nav = (link: typeof links[number]) => <button key={link.route} data-testid={link.route === '/videos' ? 'nav-videos' : link.route === '/recordings' ? 'nav-recordings' : link.route === '' ? 'nav-home' : link.route === '/chat' ? 'nav-chat' : link.route === '/settings' ? 'settings-open' : 'nav-trash'}
+    data-sidebar="menu-button" aria-label={link.label} title={collapsed ? link.label : undefined} className={`workspace-nav${link.route === '/trash' ? ' workspace-trash' : ''}`} aria-current={section === link.route || link.route === '' && route === '/meetings' || note && link.route === (noteCategory === 'video' ? '/videos' : noteCategory === 'recording' ? '/recordings' : null) ? 'page' : undefined} onClick={() => go(link.route)}>
     <link.Icon size={16} strokeWidth={1.75} aria-hidden="true" /><span>{link.label}</span>
   </button>
 
@@ -83,14 +95,14 @@ export function Workspace({ route, meeting, folders, go, back, forward, search, 
       <div className="sidebar-titlebar" />
       <div className="workspace-sidebar-body">
         <button className="workspace-search no-drag" data-testid="search-open" aria-label={t('Search')} title={`${t('Search')} (${keys('⌘K')})`} onClick={search}><Search size={16} strokeWidth={1.75} aria-hidden="true" /><span>{t('Search')}</span><kbd>{keys('⌘K')}</kbd></button>
-        <nav aria-label={t('Workspace')}>{links.slice(0, 2).map(nav)}</nav>
+        <nav aria-label={t('Workspace')}>{links.slice(0, 4).map(nav)}</nav>
         <div className="workspace-folder-label">{t('Your workspace')}</div>
         <FoldersNav collapsed={collapsed} sidebarMotion={sidebarMotion} folders={folders} route={route} go={go} />
       </div>
       <div className="workspace-sidebar-footer">
         <FinishSetup collapsed={collapsed} />
-        {nav(links[2])}
-        {nav(links[3])}
+        {nav(links[4])}
+        {nav(links[5])}
         <div className="workspace-brand"><span className="workspace-wordmark"><Wordmark height={25} /></span></div>
       </div>
       </div>

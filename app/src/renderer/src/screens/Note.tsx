@@ -91,7 +91,8 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const [finishRequested, requestFinish] = useState(false)
   const reducedMotion = useReducedMotion()
   const summaryState = useSummaryPresentation(notes, reducedMotion)
-  const hasEnhanced = m?.id === id && m.state !== 'prepared' && m.state !== 'recording' && !!notes && (!window.yogurt.fake || notes.status !== 'idle')
+  const [videoState,setVideoState]=useState<VideoState>(),[videoOpen,setVideoOpen]=useState(false)
+  const hasEnhanced = m?.id === id && m.state !== 'prepared' && m.state !== 'recording' && !!notes && (!window.yogurt.fake || notes.status !== 'idle' || !!videoState)
   // Reduced motion selects Summary in the very render that first exposes its tab.
   const instantSummary = finishRequested && hasEnhanced && reducedMotion
   const view = instantSummary ? 'enhanced' : viewState
@@ -115,8 +116,15 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const summaryButton = useRef<HTMLButtonElement>(null)
   const [confirming, setConfirming] = useState(false)
   const [organizerOpen, setOrganizerOpen] = useState(false)
-  const [videoState,setVideoState]=useState<VideoState>(),[videoOpen,setVideoOpen]=useState(false)
-  useEffect(()=>{setVideoState(undefined);setVideoOpen(false);let current=true;void window.yogurt.video.get(id).then(s=>{if(current)setVideoState(s)}).catch(()=>{});const off=window.yogurt.video.onChange(s=>{if(s.meetingId===id)setVideoState(s)});return()=>{current=false;off()}},[id])
+  useEffect(() => {
+    setVideoState(undefined); setVideoOpen(false)
+    let active = true, revision = 0
+    const refresh = () => { const mine = ++revision; void window.yogurt.video.get(id).then(s => { if (active && mine === revision) setVideoState(s) }).catch(() => {}) }
+    refresh()
+    const off = window.yogurt.video.onChange(s => { if (s.meetingId === id) { revision++; setVideoState(s) } })
+    const offImport = window.yogurt.imports.onChange(refresh)
+    return () => { active = false; off(); offImport() }
+  }, [id])
   useEffect(()=>{if(videoState&&notes?.meetingId===id&&!picked.current&&!typing.current){setView('enhanced');setPrimary('notes')}},[id,videoState?.phase,notes?.meetingId])
   const rewriteButton = useRef<HTMLButtonElement>(null)
   const [editedHere, setEditedHere] = useState(false)

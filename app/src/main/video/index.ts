@@ -3,33 +3,48 @@ import { join, relative, isAbsolute } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../store'
 import type { Llm } from '../notes/enhance'
-import { defaultVideoOptions, videoOptions, VIDEO_ASSET, type VideoState, type VideoOptions, type VideoTurn, type VideoFrame, type VideoDocument, type VideoResearch } from '../../shared/video'
-import { youtubeUrl } from '../../shared/imports'
+import { videoOptions, VIDEO_ASSET, type VideoState, type VideoOptions, type VideoTurn, type VideoFrame, type VideoDocument, type VideoResearch } from '../../shared/video'
+import { VideoSources } from '../imports/sources'
 import { DATA, representativeFrames, hash, json, renderVideoDocument, turnBatches, validateDocument } from './document'
 import { candidates, contactSheet, ensureVideo, extractFrame } from './media'
 import { investigate } from './research'
 import type { Evidence } from '../../shared/organizer'
-type Dependencies = { root: string; store: Pick<Store, 'meeting' | 'notes' | 'segments' | 'setNotes'>; changed: (s: VideoState) => void; context?: (id: string, options: VideoOptions, signal: AbortSignal) => Promise<Evidence[]>; modelKey: () => string }
+type Dependencies = { sources?: VideoSources; root: string; store: Pick<Store, 'meeting' | 'notes' | 'segments' | 'setNotes'>; changed: (s: VideoState) => void; context?: (id: string, options: VideoOptions, signal: AbortSignal) => Promise<Evidence[]>; modelKey: () => string }
 const terminal = new Set(['idle', 'ready', 'partial', 'questions', 'failed', 'cancelled', 'interrupted'])
 export class VideoWorkspace {
   private states = new Map<string, VideoState>()
-  constructor(private p: Dependencies) {}
+  readonly sources: VideoSources
+  constructor(private p: Dependencies) { this.sources = p.sources || new VideoSources(p.root) }
   dir(id: string) { if (!/^[a-f0-9-]{36}$/.test(id) || !this.p.store.meeting(id)) throw new Error('기록을 찾지 못했습니다.'); return join(this.p.root, 'meetings', id, 'video') }
   get(id: string): VideoState | undefined {
-    if (this.states.has(id)) return structuredClone(this.states.get(id)!)
-    const dir = this.dir(id); let state: VideoState
-    try { state = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')); if (!terminal.has(state.phase)) { state.phase = 'interrupted'; state.message = '이전 작업이 중단됐습니다. 저장한 단계부터 다시 시작할 수 있습니다.' } }
-    catch {
-      let source: any, info: any
-      try { source = JSON.parse(readFileSync(join(dir, '../import-source.json'), 'utf8')); info = JSON.parse(readFileSync(join(dir, '../original/youtube.info.json'), 'utf8')) } catch { return }
-      if (!source.url) return
-      const url = youtubeUrl(source.url), meeting = this.p.store.meeting(id)!
-      const duration = Number(info.duration) * 1000 || Number(meeting.durationMs) + (Number(source.start) || 0) * 1000
-      state = { schemaVersion: 1, meetingId: id, phase: 'idle', message: '전사와 화면 자료를 연결해 영상 정리본을 만들 수 있습니다.', options: { ...defaultVideoOptions },
-        metadata: { url, videoId: new URL(url).searchParams.get('v')!, title: String(info.title || meeting.title), channel: typeof info.channel === 'string' ? info.channel : undefined, uploadDate: /^\d{8}$/.test(info.upload_date) ? info.upload_date.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3') : undefined, durationMs: duration, startMs: (Number(source.start) || 0) * 1000, endMs: Math.min(source.end ? Number(source.end) * 1000 : duration, duration), transcriptSource: source.transcriptSource === 'youtube-captions' ? 'YouTube 자막' : '로컬 Whisper', captionLanguage: source.captionLanguage, captionAutomatic: source.captionAutomatic },
+    const dir = this.dir(id), found = this.sources.get(id)
+    let state = this.states.get(id), loaded = false
+    if (!state) {
+      try { state = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')); loaded = true } catch { /* Legacy jobs may have neither state nor completed provenance. */ }
+    }
+    if (!state && !found) return
+    if (!state) {
+      state = { schemaVersion: 1, meetingId: id, phase: 'idle', message: '전사와 화면 자료를 연결해 영상 정리본을 만들 수 있습니다.', options: videoOptions(found!.source.video),
+        metadata: { url: found!.url, videoId: new URL(found!.url).searchParams.get('v')!, title: this.p.store.meeting(id)!.title, durationMs: 0, startMs: 0, endMs: 0, transcriptSource: '전사 준비 중' },
         frames: [], research: [], warnings: [], checks: [], candidateCount: 0, sampledCount: 0, aiCalls: 0, updatedAt: Date.now() }
     }
-    for(const run of state.research)if(['queued','searching','writing'].includes(run.phase)){run.phase='failed';run.message='이전 조사가 중단됐습니다. 같은 주제로 다시 시작하면 읽은 자료를 재사용합니다.'}
+    if (loaded) {
+      if (!terminal.has(state.phase)) { state.phase = 'interrupted'; state.message = '이전 작업이 중단됐습니다. 저장한 단계부터 다시 시작할 수 있습니다.' }
+      for (const run of state.research) if (['queued', 'searching', 'writing'].includes(run.phase)) { run.phase = 'failed'; run.message = '이전 조사가 중단됐습니다. 같은 주제로 다시 시작하면 읽은 자료를 재사용합니다.' }
+    }
+    this.sources.remember(id, state.metadata.url)
+    const meeting = this.p.store.meeting(id)!, segments = this.p.store.segments(id)
+    if (found) {
+      const { source, info, job, url } = found
+      const ms = (value: unknown) => Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) * 1000 : 0
+      const start = ms(source.start), duration = ms(info.duration) || (Number(meeting.durationMs) || Math.max(0, ...segments.map(t => t.endMs))) + start
+      state.metadata = { ...state.metadata, url, videoId: new URL(url).searchParams.get('v')!, title: String(info.title || meeting.title), channel: typeof info.channel === 'string' ? info.channel : state.metadata.channel,
+        uploadDate: /^\d{8}$/.test(info.upload_date) ? info.upload_date.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3') : state.metadata.uploadDate,
+        durationMs: duration, startMs: start, endMs: Math.max(start, Math.min(ms(source.end) || duration, duration)),
+        transcriptSource: source.transcriptSource === 'youtube-captions' ? 'YouTube 자막' : source.transcriptSource === 'local-asr' ? '로컬 Whisper' : job?.stage === 'done' && segments.length ? '가져온 전사' : '전사 준비 중', captionLanguage: source.captionLanguage, captionAutomatic: source.captionAutomatic }
+      state.import = job ? { jobId: job.id, stage: job.stage, message: job.message } : undefined
+    }
+    state.transcriptReady = segments.some(t => t.text.trim()) && !meeting.transcriptionPending && (!state.import || state.import.stage === 'done')
     this.states.set(id, state); return structuredClone(state)
   }
   save(state: VideoState) { const dir = this.dir(state.meetingId); mkdirSync(dir, { recursive: true, mode: 0o700 }); state.updatedAt = Date.now(); this.states.set(state.meetingId, structuredClone(state)); writeFileSync(join(dir, 'state.json.tmp'), JSON.stringify(state, null, 2), { mode: 0o600 }); renameSync(join(dir, 'state.json.tmp'), join(dir, 'state.json')); this.p.changed(structuredClone(state)) }
@@ -50,6 +65,7 @@ export class VideoWorkspace {
   }
   async run(id: string, llm: Llm, signal: AbortSignal): Promise<string> {
     const s = this.get(id); if (!s) throw new Error('YouTube 원본을 찾지 못했습니다.')
+    if (!s.transcriptReady) throw new Error('전사 가져오기가 아직 완료되지 않았습니다. 가져오기 상태를 확인하세요.')
     const turns = this.turns(s); if (!turns.length) throw new Error('전사 원문이 없습니다. 먼저 가져오기를 완료하세요.')
     s.model = this.p.modelKey(); s.warnings = []; s.checks = []; s.aiCalls = 0
     const stage = (phase: VideoState['phase'], message: string) => { if (signal.aborted) throw new Error('작업을 중단했습니다.'); s.phase = phase; s.message = message; this.save(s) }

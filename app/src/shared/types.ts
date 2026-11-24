@@ -19,7 +19,7 @@ export type Theme = 'light' | 'dark' | 'system'
 export type AppVisibility = 'both' | 'menu-bar' | 'dock'
 /** The capture has stopped, but its final database state may still need an explicit retry. */
 export type MeetingView = Meeting & { stopSavePending?: true; paused?: true }
-export type MeetingCard = StoredMeetingCard & { paused?: true }
+export type MeetingCard = StoredMeetingCard & { paused?: true; category?: 'video' | 'recording' }
 
 /** What the window sees of the app: window.yogurt (the preload bridge, contextIsolation on) */
 export type YogurtApi = {
@@ -109,7 +109,7 @@ export type YogurtApi = {
     takeRecordingReminder(): Promise<string | null>
     get(id: string): Promise<MeetingView | undefined>
     /** past and current meetings for home, newest first, a page at a time (before: the last card already shown) */
-    cards(o: { before?: { at: number; id: string }; limit: number; /** only the meetings in this folder */ folder?: string }): Promise<MeetingCard[]>
+    cards(o: { category?: 'video' | 'recording'; before?: { at: number; id: string }; limit: number; /** only the meetings in this folder */ folder?: string }): Promise<MeetingCard[]>
     /** starts notes or opens the event's existing note with a guarded resume request */
     start(eventId: string | null): Promise<StartResult>
     /** opens the note for this occurrence, creating a prepared note if needed; never records */

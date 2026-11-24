@@ -20,7 +20,7 @@ export async function writeVideoZip(path: string, name: string, md: string, asse
   for (const asset of assets) zip.addBuffer(readFileSync(asset.path), 'assets/' + asset.file)
   zip.end(); await done
 }
-export function createVideoHost(p: { root: string; store: Store; queue: Queue; model: NotesModel; modelKey: () => string; context?: ConstructorParameters<typeof VideoWorkspace>[0]['context']; propose: (id: string, md: string) => void; changed: (s: VideoState) => void; notesChanged: (id: string) => void; busy?: (id: string) => boolean }) {
+export function createVideoHost(p: { sources?: ConstructorParameters<typeof VideoWorkspace>[0]['sources']; root: string; store: Store; queue: Queue; model: NotesModel; modelKey: () => string; context?: ConstructorParameters<typeof VideoWorkspace>[0]['context']; propose: (id: string, md: string) => void; changed: (s: VideoState) => void; notesChanged: (id: string) => void; busy?: (id: string) => boolean }) {
   const workspace = new VideoWorkspace(p), pending = new Map<string, AbortController>()
   const check = (id: unknown): string => { if (typeof id !== 'string') throw new Error('기록을 확인하세요.'); workspace.dir(id); return id }
   const commit = (id: string, md: string, expected?: string | null) => {
@@ -40,6 +40,7 @@ export function createVideoHost(p: { root: string; store: Store; queue: Queue; m
   const start = (id: string, options?: Partial<VideoOptions>) => {
     check(id); if (pending.has(id) || p.busy?.(id)) throw new Error('이 기록의 정리가 이미 진행 중입니다.')
     const state = options ? workspace.configure(id, options) : workspace.get(id); if (!state) throw new Error('YouTube 원본이 없습니다.')
+    if (!state.transcriptReady) throw new Error('전사 가져오기가 아직 완료되지 않았습니다. 가져오기 상태를 확인하세요.')
     if (state.options.depth === 'transcript') return state
     const expected = p.store.notes(id).enhanced
     workspace.stage(id, 'queued', '녹음·전사와 모델 대기열을 확인하고 있습니다.')

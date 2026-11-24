@@ -3,7 +3,7 @@ import { LoadingContent } from '../components/LoadingContent'
 import { StartRecording } from '../components/StartRecording'
 import { Mic } from '../components/Icons'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
-import { Circle, FileText, Users } from 'lucide-react'
+import { Circle, FileText, Users, FileVideoCamera } from 'lucide-react'
 import type { MeetingCard } from '../../../shared/types'
 import { useScrollMemory } from '../useScrollMemory'
 import { loadUpTo } from '../paging'
@@ -25,8 +25,8 @@ const PAGE = 40
 const loadedCounts = new Map<string, number>()
 
 /** The workspace, backed by the existing meeting and calendar bridge. */
-export function Home({ open, openFolder, agendaJump }: { open: (id: string) => void; openFolder?: (id: string) => void; agendaJump?: { at: number } }) {
-  const past = usePastNotes()
+export function Home({ open, openFolder, agendaJump, category }: { category?: 'video' | 'recording'; open: (id: string) => void; openFolder?: (id: string) => void; agendaJump?: { at: number } }) {
+  const past = usePastNotes(undefined, category)
   const day = useDay()
   const recording = past.cards?.find((c) => c.state === 'recording')
   const [calendarRevision, setCalendarRevision] = useState(0)
@@ -38,14 +38,14 @@ export function Home({ open, openFolder, agendaJump }: { open: (id: string) => v
     toasts.add({ id: 'home-message', data: { testId: 'home-message' }, title: r.error === 'gone' ? t('That meeting is no longer on your calendar.') : t("Yogurt couldn't start the notes. Try again in a moment.") })
   }
   const noMeetings = past.cards?.length === 0
-  const calendar = window.yogurt.capabilities.calendar
+  const calendar = window.yogurt.capabilities.calendar && category !== 'video'
   return <div data-testid="home" className={calendar ? 'native-home' : 'native-home no-agenda'}>
-    <StartRecording testId="new-note" onGone={() => setCalendarRevision(revision => revision + 1)} />
+    {category !== 'video' && <StartRecording testId="new-note" onGone={() => setCalendarRevision(revision => revision + 1)} />}
     <div className="native-library" ref={past.setRoot} tabIndex={-1}>
-      <ImportWorkspace onOpen={open}/><h1>{t('Your meetings')}</h1>
+      <ImportWorkspace onOpen={open}/><h1>{category === 'video' ? 'YouTube 영상' : category === 'recording' ? '녹음·전사' : '전체 기록'}</h1>
       <LoadingContent pending={!past.cards} testId="meetings-loading" skeleton={<MeetingListLoading />} className="library-load">{noMeetings ? <section data-testid="past-empty" className="library-empty empty-state"><div className="empty-state-content">
         <div className="empty-tile"><FileText size={28} strokeWidth={1.5} aria-hidden="true" /></div><h2>{t('Your notes will show up here')}</h2>
-        <p>{t('Yogurt writes a summary after you finish recording.')}</p>
+        <p>{category === 'video' ? 'YouTube 정리에서 링크를 넣으면 여기에 모입니다.' : '녹음하거나 음성·전사 파일을 가져오면 여기에 모입니다.'}</p>
       </div></section> : <PastNotes cards={past.cards ?? []} day={day} more={past.more} sentinel={past.setSentinel} onOpen={open} openFolder={openFolder} />}</LoadingContent>
     </div>
     {calendar && <Agenda revision={calendarRevision} recording={recording} onStart={start} onOpen={open} jumpTo={agendaJump} />}
@@ -57,12 +57,12 @@ export function Home({ open, openFolder, agendaJump }: { open: (id: string) => v
  * reloads what is already shown (one query, however far down the person scrolled). folder: only its meetings (a
  * folder's page), which also follow every change to folders.
  */
-export function usePastNotes(folder?: string) {
+export function usePastNotes(folder?: string, category?: 'video' | 'recording') {
   const [cards, setCards] = useState<MeetingCard[]>()
   const [more, setMore] = useState(false)
   const [root, setRoot] = useState<HTMLDivElement | null>(null)
   const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null)
-  const memoryKey = folder ? `folder/${folder}` : 'meetings'
+  const memoryKey = folder ? `folder/${folder}` : category || 'meetings'
   const scroll = useScrollMemory<HTMLDivElement>(memoryKey, !!cards)
   const animateRows = useMeetingRowMotion(scroll, memoryKey)
   const attachRoot = useCallback((el: HTMLDivElement | null) => { scroll.current = el; setRoot(el) }, [scroll])
@@ -73,12 +73,12 @@ export function usePastNotes(folder?: string) {
   const reload = useCallback(() => {
     const mine = ++seq.current
     // however far down the person scrolled, in steps (one call to main is capped)
-    void readMeetingRows(() => loadUpTo((o) => window.yogurt.meetings.cards({ ...o, ...(folder ? { folder } : {}) }), shown.current, PAGE)).then(({ cards: list, more }) => {
+    void readMeetingRows(() => loadUpTo((o) => window.yogurt.meetings.cards({ ...o, ...(folder ? { folder } : {}), ...(category ? { category } : {}) }), shown.current, PAGE)).then(({ cards: list, more }) => {
       if (mine !== seq.current) return
       animateRows(list)
       shown.current = list.length; loadedCounts.set(memoryKey, list.length); setCards(list); setMore(more)
     })
-  }, [folder, animateRows])
+  }, [folder, category, animateRows])
   useEffect(() => {
     reload()
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -94,7 +94,7 @@ export function usePastNotes(folder?: string) {
     loading.current = true
     const last = cards[cards.length - 1]
     const mine = seq.current
-    void window.yogurt.meetings.cards({ limit: PAGE, before: { at: last.startedAt, id: last.id }, ...(folder ? { folder } : {}) }).then((page) => {
+    void window.yogurt.meetings.cards({ limit: PAGE, before: { at: last.startedAt, id: last.id }, ...(folder ? { folder } : {}), ...(category ? { category } : {}) }).then((page) => {
       loading.current = false
       if (mine !== seq.current) return
       setCards((cur) => {
@@ -105,7 +105,7 @@ export function usePastNotes(folder?: string) {
       })
       setMore(page.length === PAGE)
     })
-  }, [cards, folder])
+  }, [cards, folder, category])
 
   useEffect(() => {
     if (!sentinel || !root || !more) return
@@ -209,8 +209,8 @@ export function PastCard({ c, onOpen, openFolder, openFolders, more, when, fixed
   }}>
     <button data-meeting-id={c.id} disabled={loading} onClick={() => onOpen(c.id)} aria-pressed={selected} className="native-meeting-link">
     <span className="meeting-content">
-    <span className={`meeting-identity ${recording ? 'recording' : ''}`} aria-hidden="true">{loading ? null : recording ? <Mic size={16} /> : c.attendees.length > 1 ? <Users size={16} /> : initials || <FileText size={16} />}</span>
-    <span className="meeting-description"><strong>{loading ? <span className="loading-bar" style={{ width: c.title.length * 6, maxWidth: '85%' }} /> : c.title}</strong><span data-testid={loading ? undefined : "past-note-attendees"} title={c.attendees.map((p) => p.name).join(', ') || undefined}>{loading ? <span className="loading-bar" style={{ width: 110 }} /> : c.attendees.length ? peopleSummary(c.attendees, me) : t('Personal notes')}</span>
+    <span className={`meeting-identity ${recording ? 'recording' : ''}`} aria-hidden="true">{loading ? null : c.category === 'video' ? <FileVideoCamera size={16} /> : recording ? <Mic size={16} /> : c.attendees.length > 1 ? <Users size={16} /> : initials || <FileText size={16} />}</span>
+    <span className="meeting-description"><strong>{loading ? <span className="loading-bar" style={{ width: c.title.length * 6, maxWidth: '85%' }} /> : c.title}</strong><span data-testid={loading ? undefined : "past-note-attendees"} title={c.attendees.map((p) => p.name).join(', ') || undefined}>{loading ? <span className="loading-bar" style={{ width: 110 }} /> : c.category === 'video' ? 'YouTube 영상' : c.attendees.length ? peopleSummary(c.attendees, me) : t('Personal notes')}</span>
     </span>
     </span>
     <span className="meeting-meta row-swap-meta">{recording ? <span className="meeting-live"><Circle size={6} fill="currentColor" />{c.paused ? t('Paused') : t('Recording')}</span> : <><time>{loading ? <span className="loading-bar" style={{ width: 45 }} /> : when ?? timeOf(c.startedAt)}</time>{minutes != null && <small data-testid="past-note-duration">{loading ? <span className="loading-bar" style={{ width: 26 }} /> : t('{count} min', { count: minutes })}</small>}</>}</span>

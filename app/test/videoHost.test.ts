@@ -36,3 +36,10 @@ it('limits research context to selected public turns and resumes stored receipts
  const state=f.host.workspace.get(f.m.id)!;const run=state.research[0];run.phase='searching';run.sources=[{id:'R1',title:'read',url:'https://example.org/paper',accessedAt:'2026-11-24',text:'본문',sha256:'hash'}];f.host.workspace.save(state)
  const restarted=new VideoWorkspace({root:f.root,store:f.store,changed:()=>{},modelKey:()=> 'gpt-test'});expect(restarted.get(f.m.id)?.research[0].phase).toBe('failed');expect(restarted.newResearch(f.m.id,'상관과 인과')).toBe(run.id);expect(restarted.get(f.m.id)?.research[0].sources).toHaveLength(1)
 })
+
+it('rejects partial imports before queue admission or model loading',()=>{
+ const f=fixture(),jobId='bfadcccf-96f5-4b88-b965-2a7c735e2654';mkdirSync(join(f.root,'imports'))
+ writeFileSync(join(f.root,'imports',jobId+'.json'),JSON.stringify({id:jobId,meetingId:f.m.id,url:'https://www.youtube.com/watch?v=abcdefghijk',stage:'transcribing',updatedAt:1,message:'전사 중'}))
+ expect(()=>f.host.start(f.m.id)).toThrow('아직 완료되지');expect(f.jobs).toHaveLength(0);expect(f.llm).not.toHaveBeenCalled()
+ expect(f.host.workspace.get(f.m.id)?.phase).toBe('ready')
+})
