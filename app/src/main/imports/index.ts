@@ -8,6 +8,7 @@ import { importMaterial } from '../organizer/runtime'
 import { MEDIA_EXTS,TRANSCRIPT_EXTS,parseTranscript,youtubeUrl,type ImportFile,type ImportJob,type ImportRequest,type ImportStage } from '../../shared/imports'
 import { command,ffmpegDecode,mediaTool } from './tools'
 import { downloadYouTube, youtubeImportError } from './youtube'
+import { videoOptions, type VideoOptions } from '../../shared/video'
 
 const errorText=(e:unknown)=>e instanceof Error?e.message:String(e)
 const hashFile=(file:string)=>new Promise<string>((resolve,reject)=>{const h=createHash('sha256'),r=createReadStream(file);r.on('data',b=>h.update(b));r.on('error',reject);r.on('end',()=>resolve(h.digest('hex')))})
@@ -23,7 +24,7 @@ export function describeFile(path:string):ImportFile {
   if(!MEDIA_EXTS.includes(ext)&&!TRANSCRIPT_EXTS.includes(ext))throw new Error('지원하지 않는 파일 형식: '+ext)
   return {path,name:basename(path),bytes:stat.size,kind:MEDIA_EXTS.includes(ext)?'media':'transcript'}
 }
-type Deps={root:string;store:Store;window:()=>BrowserWindow|undefined;changed:()=>void;available:()=>boolean;recording:()=>boolean;transcribe:(id:string,tracks:{them:AsyncIterable<Float32Array>},stop:()=>boolean)=>Promise<boolean>}
+type Deps={completed?:(id:string,options?:VideoOptions)=>void;root:string;store:Store;window:()=>BrowserWindow|undefined;changed:()=>void;available:()=>boolean;recording:()=>boolean;transcribe:(id:string,tracks:{them:AsyncIterable<Float32Array>},stop:()=>boolean)=>Promise<boolean>}
 export class ImportManager {
   private jobs=new Map<string,ImportJob>();private current?:{id:string;abort:AbortController};private scheduled=false
   constructor(private d:Deps){
@@ -46,7 +47,7 @@ export class ImportManager {
     if((!files.length&&!url)||files.length>2||files.filter(f=>f.kind==='media').length>1||files.filter(f=>f.kind==='transcript').length>1||url&&files.length)throw new Error('음성/동영상 1개와 전사 1개를 함께 넣거나 YouTube 링크를 입력하세요.')
     const start=Number(raw.start||0),end=raw.end==null||raw.end===0?undefined:Number(raw.end)
     if(!Number.isFinite(start)||start<0||end!==undefined&&(!Number.isFinite(end)||end<=start))throw new Error('영상 구간의 시작/종료 초를 확인하세요.')
-    const j:ImportJob={id:randomUUID(),title:typeof raw.title==='string'&&raw.title.trim()?raw.title.trim().slice(0,200):files[0]?.name.replace(/\.[^.]+$/,'')||'YouTube 영상',files,url,caption:!!raw.caption,start,end,stage:'queued',message:'가져오기를 기다리고 있습니다.',createdAt:Date.now(),updatedAt:Date.now()}
+    const j:ImportJob={video:url&&raw.video?videoOptions(raw.video):undefined,id:randomUUID(),title:typeof raw.title==='string'&&raw.title.trim()?raw.title.trim().slice(0,200):files[0]?.name.replace(/\.[^.]+$/,'')||'YouTube 영상',files,url,caption:!!raw.caption,start,end,stage:'queued',message:'가져오기를 기다리고 있습니다.',createdAt:Date.now(),updatedAt:Date.now()}
     this.save(j,'queued',j.message);this.kick();return structuredClone(j)
   }
   cancel(id:string){const j=this.jobs.get(id);if(!j||j.stage==='done')return;if(this.current?.id===id)this.current.abort.abort();this.save(j,'cancelled','작업을 중단했습니다. 원본과 완료된 단계는 남아 있습니다.')}
@@ -124,7 +125,9 @@ export class ImportManager {
     writeFileSync(join(dir,'import-source.json'),JSON.stringify({url:j.url,caption:!!j.caption,transcriptSource:j.transcriptSource,captionLanguage:j.captionLanguage,captionAutomatic:j.captionAutomatic,captionFallback:j.captionFallback,start:j.start,end:j.end,assets:j.assets,importedAt:j.createdAt},null,2),{mode:0o600})
     j.durationMs=Math.round(duration)
     this.d.store.updateMeeting(id,{durationMs:j.durationMs,endedAt:(this.d.store.meeting(id)?.startedAt||Date.now())+j.durationMs})
+    if(!j.captionFallback)delete j.errorDetail
     this.save(j,'done',transcript?'기존 전사를 가져왔습니다. 기록을 열어 맥락 자료를 넣고 정리를 시작하세요.':j.captionFallback?'자막을 가져오지 못해 로컬 음성 전사를 완료했습니다. 기록을 열어 정리를 시작하세요.':'전사가 끝났습니다. 기록을 열어 맥락 자료를 넣고 정리를 시작하세요.')
+    this.d.completed?.(id,j.video)
   }
 }
 export function hookImports(d:Deps){

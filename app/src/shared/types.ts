@@ -23,6 +23,19 @@ export type MeetingCard = StoredMeetingCard & { paused?: true }
 
 /** What the window sees of the app: window.yogurt (the preload bridge, contextIsolation on) */
 export type YogurtApi = {
+  video: {
+    get(id:string):Promise<import('./video').VideoState|undefined>
+    start(id:string,options:Partial<import('./video').VideoOptions>):Promise<import('./video').VideoState>
+    cancel(id:string):Promise<import('./video').VideoState>
+    answer(id:string,answers:Record<string,string>):Promise<import('./video').VideoState>
+    frame(id:string,frameId:string,patch:{description?:string;hidden?:boolean}):Promise<import('./video').VideoState>
+    applyChanges(id:string):Promise<boolean>
+    research(id:string,topic:string):Promise<import('./video').VideoState>
+    appendResearch(id:string,researchId:string):Promise<boolean>
+    copy(id:string):Promise<boolean>
+    export(id:string,withAssets:boolean):Promise<'saved'|'cancelled'>
+    onChange(cb:(state:import('./video').VideoState)=>void):()=>void
+  }
   speech: { get():Promise<{selected:string;models:{id:string;name:string;bytes:number}[]}>; select(id:string):Promise<{ok:boolean;message:string}> }
   versions: { restore(id:string,revision:string,expected:string|null):Promise<boolean>; list(id: string): Promise<{id:string;side:string;reason:string;createdAt:number;chars:number}[]>; read(id:string,revision:string):Promise<{text:string;side:string}|undefined>; candidate(id:string):Promise<string|undefined>; accept(id:string,expected:string):Promise<boolean> }
   imports: { info(id:string):Promise<{timed:boolean;kind:string}|undefined>; pick(): Promise<import('./imports').ImportFile[]>; describe(paths: string[]): Promise<import('./imports').ImportFile[]>; filePath(file: File): string; start(request: import('./imports').ImportRequest): Promise<import('./imports').ImportJob>; list(): Promise<import('./imports').ImportJob[]>; cancel(id: string): Promise<void>; retry(id: string): Promise<void>; tools(): Promise<{name:string;ready:boolean;version:string}[]>; onChange(cb: (jobs: import('./imports').ImportJob[])=>void): ()=>void }

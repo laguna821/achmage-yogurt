@@ -1,7 +1,7 @@
 export type ImportFile = { path: string; name: string; bytes: number; kind: 'media' | 'transcript' }
 export type ImportStage = 'queued' | 'copying' | 'downloading' | 'converting' | 'transcribing' | 'waiting' | 'done' | 'failed' | 'cancelled' | 'interrupted'
-export type ImportJob = { id: string; meetingId?: string; title: string; files: ImportFile[]; url?: string; caption?: boolean; captionFallback?: string; errorDetail?: string; transcriptSource?: 'youtube-captions' | 'local-asr'; captionLanguage?: string; captionAutomatic?: boolean; start?: number; end?: number; stage: ImportStage; message: string; createdAt: number; updatedAt: number; durationMs?: number; assets?: { name: string; sha256: string; bytes: number }[] }
-export type ImportRequest = { paths?: string[]; title?: string; url?: string; caption?: boolean; start?: number; end?: number }
+export type ImportJob = { video?: import('./video').VideoOptions; id: string; meetingId?: string; title: string; files: ImportFile[]; url?: string; caption?: boolean; captionFallback?: string; errorDetail?: string; transcriptSource?: 'youtube-captions' | 'local-asr'; captionLanguage?: string; captionAutomatic?: boolean; start?: number; end?: number; stage: ImportStage; message: string; createdAt: number; updatedAt: number; durationMs?: number; assets?: { name: string; sha256: string; bytes: number }[] }
+export type ImportRequest = { video?: Partial<import('./video').VideoOptions>; paths?: string[]; title?: string; url?: string; caption?: boolean; start?: number; end?: number }
 export type ImportedTurn = { text: string; startMs: number; endMs: number; speaker: string | null }
 export const MEDIA_EXTS = ['wav','mp3','m4a','flac','ogg','opus','webm','mp4','mov','aac','aiff','mkv']
 export const TRANSCRIPT_EXTS = ['txt','md','srt','vtt','json','docx','pdf']

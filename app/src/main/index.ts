@@ -1,6 +1,8 @@
 import { migrateLegacyProfile } from './profileMigration'
 import { hookNoteVersions } from './noteVersions'
 import { hookImports,importedTranscriptInfo } from './imports'
+import { createVideoHost, VIDEO_SCHEME } from './video/ipc'
+import { suppliedLinks, vaultEvidence, mailEvidence } from './organizer/evidence'
 import { hookAppearance } from './appearance'
 import { createOrganizerHost } from './organizer/ipc'
 import { matchSearchPeople, searchPersonKey } from '../shared/searchPeople'
@@ -88,7 +90,7 @@ import { finishQuit, hookUpdates, isPreviewBuild, updateOfferChanged, updatesOn 
 import type { NoteSaveResult, StartResult } from '../shared/types'
 
 // the transcript's player streams each meeting's audio from here; seeking needs stream support (before ready)
-protocol.registerSchemesAsPrivileged([{ scheme: AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true } }])
+protocol.registerSchemesAsPrivileged([{ scheme: VIDEO_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }, { scheme: AUDIO_SCHEME, privileges: { standard: true, secure: true, stream: true } }])
 
 app.setName('Achmage Yogurt')
 // Windows shows notifications only for an app with this id (the installer's shortcut carries the same one, electron-builder appId)
@@ -596,7 +598,7 @@ app.whenReady().then(async () => {
   const readsAhead = false
   // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
   const engine = isFake() ? new FakeEngine() : new SubscriptionEngine(() => subscriptionModel(loadSettings(settingsFile).aiModel), join(userDataDir(), 'subscription-runtime'), () => reasoningEffort(loadSettings(settingsFile).aiReasoningEffort))
-  if (!isFake()) hookSubscriptionSettings(userDataDir(), () => !!organizerHost?.organizer.running || engine instanceof SubscriptionEngine && engine.busy)
+  if (!isFake()) hookSubscriptionSettings(userDataDir(), () => !!videoHost?.running() || !!organizerHost?.organizer.running || engine instanceof SubscriptionEngine && engine.busy)
   // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
   const smallMac = isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem())
   const model = createNotesModel({ engine, recordMode: !isFake(), modelPath: () => isFake() ? setup.notesPath() : setup.notesPath() ? `subscription:${subscriptionModel(loadSettings(settingsFile).aiModel)}` : undefined, onLoaded: path => setup.notesModelLoaded(path) })
@@ -631,10 +633,11 @@ app.whenReady().then(async () => {
     ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
   const organizerHost = !isFake() ? createOrganizerHost(userDataDir(), (existsSync(join(process.resourcesPath, 'achmage-transcript')) ? join(process.resourcesPath, 'achmage-transcript') : join(__dirname, '../../resources/achmage-transcript')), (id): id is string => isId(id) && !!store.meeting(id), state => win?.webContents.send('organizer:changed', state)) : undefined
+  let videoHost: ReturnType<typeof createVideoHost> | undefined
   const notes = hookNotes({
     propose: versions.propose,
     manual: !isFake(),
-    ...(organizerHost ? { organize: (id, input, llm, token, signal) => organizerHost.organizer.run(id, importedTranscriptInfo(userDataDir(),id)?.timed===false ? {...input,transcript:input.transcript.replace(/^\[[^\]]+\] /gm,'[시간 정보 없음] ')} : input, llm, token, store.meeting(id)!.startedAt, signal), organized: (id, md) => organizerHost.organizer.complete(id, md) } : {}),
+    ...(organizerHost ? { organize: (id, input, llm, token, signal) => videoHost?.workspace.get(id) ? videoHost.workspace.run(id,llm,signal) : organizerHost.organizer.run(id, importedTranscriptInfo(userDataDir(),id)?.timed===false ? {...input,transcript:input.transcript.replace(/^\[[^\]]+\] /gm,'[시간 정보 없음] ')} : input, llm, token, store.meeting(id)!.startedAt, signal), organized: (id, md) => {if(!videoHost?.workspace.get(id))organizerHost.organizer.complete(id, md)} } : {}),
     summarized: id => { folderSuggestions.schedule(id); void removeRecording(id, true) },
     // Windows and Linux: a note waiting while the model loads says so (a Mac shows what it always did)
     showLoading: platform !== 'darwin',
@@ -645,8 +648,24 @@ app.whenReady().then(async () => {
     // the notes are written: the meeting goes into the library for chat across meetings
     changed: () => { win?.webContents.send('meetings:changed'); void indexer.schedule() },
   })
+  videoHost = createVideoHost({root:userDataDir(),store,queue,model,propose:versions.propose,
+    modelKey:()=>`${subscriptionModel(loadSettings(settingsFile).aiModel)} · ${reasoningEffort(loadSettings(settingsFile).aiReasoningEffort)}`,
+    changed:state=>win?.webContents.send('video:changed',state),
+    notesChanged:id=>{win?.webContents.send('notes:changed',notes.view(id));win?.webContents.send('meetings:changed');void indexer.schedule()},
+    busy:id=>['waiting','writing'].includes(notes.view(id).status)||!!organizerHost&&['preparing','researching','matching','drafting','checking'].includes(organizerHost.organizer.get(id).phase),
+    context:async(id,options,signal)=>{
+      const state=organizerHost?.organizer.get(id), evidence=(state?.evidence||[]).filter(e=>e.provider==='attached'||e.provider==='mail'&&e.issueIds.length===0)
+      // Only explicitly selected sources participate; private context never becomes a public search query.
+      const links=await suppliedLinks(options.links,signal);evidence.push(...links.evidence)
+      const issue={id:'video-context',category:'term' as const,question:'영상과 직접 관련된 맥락 자료',context:options.notes.slice(0,800),query:(options.notes||store.meeting(id)?.title||'').slice(0,180)}
+      if(options.vault)evidence.push(...(await vaultEvidence([issue],issue.query,signal)).evidence)
+      if(options.mail)evidence.push(...(await mailEvidence([issue],store.meeting(id)!.startedAt,signal,organizerHost?.gmail)).evidence)
+      return evidence
+    }
+  })
   ipcMain.handle('meetings:resume', async (_e, id: unknown): Promise<StartResult> => {
     if (!isId(id)) return { error: 'gone' }
+    if (videoHost?.workspace.get(id)) return {error:'failed'}
     const current = activeMeeting()
     if (current) { goTo(`/note/${current.id}`); return { id: current.id } }
     const existing = store.meeting(id)
@@ -784,7 +803,7 @@ app.whenReady().then(async () => {
     if (!meeting || meeting.trashedAt != null || activeMeeting() || resumingId) return
     await joinParts(dir)
   })
-  const importer = hookImports({ root: userDataDir(), store, window: () => win, changed: () => { win?.webContents.send('meetings:changed'); }, available: () => setup.state.phase === 'ready' && !!setup.installed()?.asr && !activeMeeting() && !backfilling, recording: () => !!activeMeeting() || backfilling, transcribe: transcribeRecorded })
+  const importer = hookImports({ completed:(id,options)=>{if(options&&options.depth!=='transcript')try{videoHost?.start(id,options)}catch(e){console.error('영상 정리 등록 실패',e)}}, root: userDataDir(), store, window: () => win, changed: () => { win?.webContents.send('meetings:changed'); }, available: () => setup.state.phase === 'ready' && !!setup.installed()?.asr && !activeMeeting() && !backfilling, recording: () => !!activeMeeting() || backfilling, transcribe: transcribeRecorded })
   // meetings whose notes a quit or crash cut short: caught up once the models are ready, one at a time
   let caughtUp = false
   // and meetings not in the library yet (or changed since) are indexed, once nothing else is waiting
@@ -857,6 +876,7 @@ app.whenReady().then(async () => {
     })
   })
   app.on('before-quit', (e) => {
+    videoHost?.stop()
     if (allowQuit) return
     e.preventDefault()
     if (finishing) return

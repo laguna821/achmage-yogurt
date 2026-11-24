@@ -27,7 +27,7 @@ export default defineConfig({
         name: 'yogurt-csp',
         apply: 'build',
         transformIndexHtml: (html: string) =>
-          html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' blob: yogurt-audio:" />`),
+          html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: yogurt-video:; font-src 'self' data:; media-src 'self' blob: yogurt-audio:" />`),
       },
     ],
   },

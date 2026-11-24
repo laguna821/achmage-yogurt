@@ -1,3 +1,5 @@
+import {VideoWorkspacePanel} from '../components/VideoWorkspace'
+import type {VideoState} from '../../../shared/video'
 import { NoteVersions } from '../components/NoteVersions'
 import { OrganizerWorkspace } from '../components/OrganizerWorkspace'
 import { citationTargetIndex } from '../../../shared/citations'
@@ -113,6 +115,9 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const summaryButton = useRef<HTMLButtonElement>(null)
   const [confirming, setConfirming] = useState(false)
   const [organizerOpen, setOrganizerOpen] = useState(false)
+  const [videoState,setVideoState]=useState<VideoState>(),[videoOpen,setVideoOpen]=useState(false)
+  useEffect(()=>{setVideoState(undefined);setVideoOpen(false);let current=true;void window.yogurt.video.get(id).then(s=>{if(current)setVideoState(s)}).catch(()=>{});const off=window.yogurt.video.onChange(s=>{if(s.meetingId===id)setVideoState(s)});return()=>{current=false;off()}},[id])
+  useEffect(()=>{if(videoState&&notes?.meetingId===id&&!picked.current&&!typing.current){setView('enhanced');setPrimary('notes')}},[id,videoState?.phase,notes?.meetingId])
   const rewriteButton = useRef<HTMLButtonElement>(null)
   const [editedHere, setEditedHere] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -300,6 +305,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
     : mineSave.status === 'saving' || enhancedSave.status === 'saving' ? 'saving' : 'saved'
   const dismissRewrite = () => { setConfirming(false); rewriteButton.current?.focus({ preventScroll: true }) }
   const writeAgain = async () => {
+    if(videoState){pick('enhanced');setVideoOpen(true);return}
     if (!window.yogurt.fake) { pick('enhanced'); setOrganizerOpen(true); return }
     const confirmed = confirming
     // Confirm is a completed choice; do not offer a Cancel UI while its save is still pending.
@@ -350,7 +356,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
                   </button>
                 </>}
                 {finishing && <span data-testid="note-finishing" role="status" className="note-finishing">{t('Finishing…')}</span>}
-                {!finishing && (m.state === 'stopped' || m.state === 'done') && !m.stopSavePending && !trashed && <button data-testid="note-resume" disabled={starting || summarizing} aria-busy={summarizing} data-processing={summarizing} onClick={() => void resumeRecording()}
+                {!videoState && !finishing && (m.state === 'stopped' || m.state === 'done') && !m.stopSavePending && !trashed && <button data-testid="note-resume" disabled={starting || summarizing} aria-busy={summarizing} data-processing={summarizing} onClick={() => void resumeRecording()}
                   className="note-record-action note-resume-action" title={summarizing ? t('Summarizing…') : t('Resume recording in this note')}>
                   <Swap show={summarizing ? 'busy' : 'mic'} options={{ mic: <Mic size={14} />, busy: <Loader size={14} /> }} />
                   <SwapText text={summarizing ? t('Summarizing…') : starting ? t('Preparing…') : t('Resume recording')} widest={t('Resume recording')} />
@@ -383,7 +389,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
             </button>
             {hasEnhanced && <button ref={summaryButton} id="note-summary-tab" data-testid="note-summary-tab" role="tab" aria-selected={primary === 'notes' && shown === 'enhanced'} aria-controls="note-notes-panel"
               tabIndex={primary === 'notes' && shown === 'enhanced' ? 0 : -1} onKeyDown={primaryKey}
-              onClick={(e) => { pickTab('notes', 'enhanced', e.detail > 0); if (!window.yogurt.fake && notes.enhanced == null) setOrganizerOpen(true) }}>
+              onClick={(e) => { pickTab('notes', 'enhanced', e.detail > 0); if (notes.enhanced == null) {if(videoState)setVideoOpen(true);else if(!window.yogurt.fake)setOrganizerOpen(true)} }}>
               <Sparkles size={14} strokeWidth={1.75} aria-hidden="true" />{window.yogurt.fake ? t('Summary') : '정리'}
             </button>}
             </div>
@@ -399,7 +405,8 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
                   focus={primary === 'notes' && at?.ms === null ? at : undefined} testId="note-mine" label={t('My notes')} className="min-h-[40vh]" markdown={notes.mine} placeholder={t('You can add notes here to guide the summary.')}
                   onChange={(md) => { typing.current = true; const next = { ...current.current!, mine: md }; current.current = next; setNotes(next); mineSave.change(md) }}
                   onBlur={() => { typing.current = false; mineSave.flush() }}
-                /> : <>{!window.yogurt.fake && <OrganizerWorkspace key={`organizer-${id}`} id={id} open={organizerOpen} setOpen={setOrganizerOpen} edited={notes.edited || editedHere} beforeStart={async () => { if (!await saveAll()) return false; setEditedHere(false); return true }} />}<NoteVersions id={id} current={notes.enhanced || ''} beforeUse={saveAll} onApplied={() => { void window.yogurt.notes.get(id).then(n => { current.current=n;setNotes(n);setEditedHere(false) }) }}/><Enhanced key={id} presentation={summaryState} focus={primary === 'notes' && at?.ms === null ? at : undefined} notes={notes} disabled={starting} onChange={(md) => { setEditedHere(true); const next = { ...current.current!, enhanced: md }; current.current = next; setNotes(next); enhancedSave.change(md) }} onBlur={enhancedSave.flush} onRetry={writeAgain} /></>}
+                /> : <>{videoState&&<VideoWorkspacePanel id={id} state={videoState} setState={setVideoState} open={videoOpen} setOpen={setVideoOpen} beforeUse={saveAll}/>}
+{!videoState&&!window.yogurt.fake && <OrganizerWorkspace key={`organizer-${id}`} id={id} open={organizerOpen} setOpen={setOrganizerOpen} edited={notes.edited || editedHere} beforeStart={async () => { if (!await saveAll()) return false; setEditedHere(false); return true }} />}<NoteVersions id={id} current={notes.enhanced || ''} beforeUse={saveAll} onApplied={() => { void window.yogurt.notes.get(id).then(n => { current.current=n;setNotes(n);setEditedHere(false) }) }}/><Enhanced key={id} presentation={summaryState} focus={primary === 'notes' && at?.ms === null ? at : undefined} notes={notes} disabled={starting} onChange={(md) => { setEditedHere(true); const next = { ...current.current!, enhanced: md }; current.current = next; setNotes(next); enhancedSave.change(md) }} onBlur={enhancedSave.flush} onRetry={writeAgain} /></>}
           </NoteReadingPane>
           {(primary === 'transcript' || transcriptVisited) && <section hidden={primary !== 'transcript'} id="note-transcript-panel" role="tabpanel" aria-labelledby="note-transcript-tab" className="note-content note-transcript-pane">
             <Transcript id={id} recording={recording} active={primary === 'transcript'} inline toolbar={transcriptToolbar} focus={at?.ms != null ? { ...at, ms: at.ms } : undefined} />
@@ -535,10 +542,10 @@ function Enhanced({ notes, presentation, disabled, onChange, onBlur, onRetry, fo
       {(rewriting || handoff) && <SummaryWaiting outline={false} writing={handoff} step={notes.step} part={status === 'writing' ? notes.part : undefined} />}
       <div ref={surface} className="summary-rewrite" data-rewriting={rewriting} data-handoff={handoff} style={handoff ? { minHeight: height.current } : undefined}>
         <div className="summary-result">
-          <Editor focus={focus} testId="note-enhanced-editor" label={'정리본'} className="enhanced" markdown={writing ? draft : notes.enhanced ?? ''} streaming={writing} editable={!writing && !rewriting && !disabled} onChange={onChange} onBlur={onBlur} />
+          <Editor meetingId={notes.meetingId} focus={focus} testId="note-enhanced-editor" label={'정리본'} className="enhanced" markdown={writing ? draft : notes.enhanced ?? ''} streaming={writing} editable={!writing && !rewriting && !disabled} onChange={onChange} onBlur={onBlur} />
         </div>
         {handoff && <div className="summary-previous" aria-hidden="true" inert>
-          <Editor testId="note-enhanced-previous" label={'정리본'} className="enhanced" markdown={notes.enhanced ?? ''} editable={false} />
+          <Editor meetingId={notes.meetingId} testId="note-enhanced-previous" label={'정리본'} className="enhanced" markdown={notes.enhanced ?? ''} editable={false} />
         </div>}
       </div>
       {/* the caret dot and the Summarizing pill show progress; a visible label here would ride the end of the text up and down */}

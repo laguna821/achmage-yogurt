@@ -4,6 +4,12 @@ import { capabilities, platformOf } from '../shared/platform'
 import type { ChatView, ConversationSummary, ConversationView, NoteView, PromptAction, SetupState, UpdateStatus, WidgetView, YogurtApi } from '../shared/types'
 
 const api: YogurtApi = {
+  video: {
+    get:id=>ipcRenderer.invoke('video:get',id),start:(id,options)=>ipcRenderer.invoke('video:start',id,options),cancel:id=>ipcRenderer.invoke('video:cancel',id),
+    answer:(id,answers)=>ipcRenderer.invoke('video:answer',id,answers),frame:(id,frameId,patch)=>ipcRenderer.invoke('video:frame',id,frameId,patch),applyChanges:id=>ipcRenderer.invoke('video:apply-changes',id),
+    research:(id,topic)=>ipcRenderer.invoke('video:research',id,topic),appendResearch:(id,researchId)=>ipcRenderer.invoke('video:append-research',id,researchId),copy:id=>ipcRenderer.invoke('video:copy',id),export:(id,assets)=>ipcRenderer.invoke('video:export',id,assets),
+    onChange:cb=>{const on=(_e:unknown,state:Parameters<typeof cb>[0])=>cb(state);ipcRenderer.on('video:changed',on);return()=>ipcRenderer.off('video:changed',on)}
+  },
   speech: {get:()=>ipcRenderer.invoke('speech:get'),select:id=>ipcRenderer.invoke('speech:select',id)},
   versions: { restore: (id,revision,expected) => ipcRenderer.invoke('versions:restore',id,revision,expected), list: id => ipcRenderer.invoke('versions:list',id), read: (id,revision) => ipcRenderer.invoke('versions:read',id,revision), candidate: id => ipcRenderer.invoke('versions:candidate',id), accept: (id,expected) => ipcRenderer.invoke('versions:accept',id,expected) },
   imports: { info: id => ipcRenderer.invoke('imports:info',id), pick: () => ipcRenderer.invoke('imports:pick'), describe: paths => ipcRenderer.invoke('imports:describe', paths), filePath: file => webUtils.getPathForFile(file), start: request => ipcRenderer.invoke('imports:start', request), list: () => ipcRenderer.invoke('imports:list'), cancel: id => ipcRenderer.invoke('imports:cancel', id), retry: id => ipcRenderer.invoke('imports:retry', id), tools: () => ipcRenderer.invoke('imports:tools'), onChange: cb => { const fn = (_e: unknown, jobs: import('../shared/imports').ImportJob[]) => cb(jobs); ipcRenderer.on('imports:changed', fn); return () => { ipcRenderer.removeListener('imports:changed', fn) } } },

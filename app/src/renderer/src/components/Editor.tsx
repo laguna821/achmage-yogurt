@@ -6,6 +6,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import {VIDEO_ASSET,videoAssetUrl} from '../../../shared/video'
 
 type Mode = 'live' | 'source' | 'read'
 const refresh = StateEffect.define<null>()
@@ -14,12 +15,14 @@ export function renderMarkdown(source:string):string {
   return DOMPurify.sanitize(marked.parse(source,{async:false,gfm:true}) as string,{FORBID_TAGS:['style','iframe','object','form'],FORBID_ATTR:['style']})
 }
 class RenderedBlock extends WidgetType {
-  constructor(readonly source:string,readonly from:number,readonly readOnly:boolean){super()}
-  eq(other:RenderedBlock){return other.source===this.source&&other.from===this.from&&other.readOnly===this.readOnly}
+  constructor(readonly source:string,readonly from:number,readonly readOnly:boolean,readonly meetingId?:string){super()}
+  eq(other:RenderedBlock){return other.source===this.source&&other.from===this.from&&other.readOnly===this.readOnly&&other.meetingId===this.meetingId}
   toDOM(view:EditorView){
     const el=document.createElement('div');el.className='markdown-preview-block note-prose';el.innerHTML=renderMarkdown(this.source)
+    for(const image of el.querySelectorAll('img')) {const file=(image.getAttribute('src')||'').replace(/^assets\//,'');if(this.meetingId&&VIDEO_ASSET.test(file)){image.src=videoAssetUrl(this.meetingId,file);image.loading='lazy'}else image.remove()}
+    for(const link of el.querySelectorAll('a')){if(/^https?:\/\//.test(link.href)){link.target='_blank';link.rel='noreferrer noopener'}}
     el.addEventListener('mousedown',e=>{
-      if(this.readOnly)return
+      if(this.readOnly||(e.target instanceof Element&&e.target.closest('a')))return
       const caret=document.caretRangeFromPoint(e.clientX,e.clientY),leaf=caret?.startContainer.nodeType===globalThis.Node.TEXT_NODE?caret.startContainer.textContent||'':''
       const at=leaf?this.source.indexOf(leaf):-1,offset=at>=0?at+(caret?.startOffset||0):0
       e.preventDefault();view.dispatch({selection:{anchor:Math.min(this.from+offset,view.state.doc.length)},effects:refresh.of(null)});view.focus()
@@ -37,7 +40,7 @@ class RenderedBlock extends WidgetType {
   }
   ignoreEvent(){return false}
 }
-function livePreview(readOnly:boolean){
+function livePreview(readOnly:boolean,meetingId?:string){
   let cached='',blocks:{from:number;to:number;source:string}[]=[]
   const build=(state:EditorState):DecorationSet=>{
     const text=state.doc.toString()
@@ -45,7 +48,7 @@ function livePreview(readOnly:boolean){
     const ranges:Range<Decoration>[]=[]
     for(const block of blocks){
       const active=!readOnly&&state.selection.ranges.some(r=>r.from<=block.to&&r.to>=block.from)
-      if(!active&&block.to>block.from)ranges.push(Decoration.replace({widget:new RenderedBlock(block.source,block.from,readOnly),block:true}).range(block.from,block.to))
+      if(!active&&block.to>block.from)ranges.push(Decoration.replace({widget:new RenderedBlock(block.source,block.from,readOnly,meetingId),block:true}).range(block.from,block.to))
     }
     return Decoration.set(ranges,true)
   }
@@ -53,10 +56,10 @@ function livePreview(readOnly:boolean){
 }
 
 /** Markdown is the document. Rendering never serializes or rewrites its bytes. */
-export function Editor(p:{focus?:{match?:string;seq:number};markdown:string;label:string;onChange?:(md:string)=>void;onBlur?:()=>void;editable?:boolean;streaming?:boolean;placeholder?:string;testId:string;className?:string}){
+export function Editor(p:{meetingId?:string;focus?:{match?:string;seq:number};markdown:string;label:string;onChange?:(md:string)=>void;onBlur?:()=>void;editable?:boolean;streaming?:boolean;placeholder?:string;testId:string;className?:string}){
   const parent=useRef<HTMLDivElement>(null),view=useRef<EditorView|undefined>(undefined),callbacks=useRef(p),external=useRef(false)
   const compartment=useRef(new Compartment())
-  const modes=(value:Mode,streaming=false)=>[EditorView.editable.of(value!=='read'&&!streaming),EditorState.readOnly.of(value==='read'||streaming),...(value==='source'?[]:[livePreview(value==='read'||streaming)])]
+  const modes=(value:Mode,streaming=false)=>[EditorView.editable.of(value!=='read'&&!streaming),EditorState.readOnly.of(value==='read'||streaming),...(value==='source'?[]:[livePreview(value==='read'||streaming,p.meetingId)])]
   callbacks.current=p
   const [mode,setMode]=useState<Mode>(()=>{try{const v=localStorage.getItem('achmage-editor-mode');return v==='source'||v==='read'?v:'live'}catch{return 'live'}})
   const resolved=p.editable===false?'read':mode
@@ -81,6 +84,7 @@ export function Editor(p:{focus?:{match?:string;seq:number};markdown:string;labe
     const at=p.focus.match?v.state.doc.toString().indexOf(p.focus.match):0
     v.dispatch({selection:{anchor:Math.max(0,at)},effects:EditorView.scrollIntoView(Math.max(0,at),{y:'center'})});v.focus()
   },[p.focus?.seq])
+  useEffect(()=>{if(!p.meetingId)return;const focus=(event:Event)=>{const d=(event as CustomEvent).detail,v=view.current;if(d?.id!==p.meetingId||!v||!p.testId.includes('enhanced'))return;const at=v.state.doc.toString().indexOf(d.title);if(at>=0){v.dispatch({selection:{anchor:at},effects:EditorView.scrollIntoView(at,{y:'start'})});v.focus()}};window.addEventListener('video:focus',focus);return()=>window.removeEventListener('video:focus',focus)},[p.meetingId,p.testId])
   return <div className={'markdown-editor '+(p.className||'')}>
     {p.editable!==false&&!p.streaming&&<div className="markdown-modebar" role="toolbar" aria-label="Markdown 보기 방식">{(['live','read','source'] as Mode[]).map(m=><button key={m} aria-pressed={mode===m} onClick={()=>{callbacks.current.onBlur?.();setMode(m);localStorage.setItem('achmage-editor-mode',m)}}>{m==='live'?'라이브 편집':m==='read'?'읽기':'원문'}</button>)}<span>자동 저장</span></div>}
     <div ref={parent} data-markdown-mode={resolved}/>

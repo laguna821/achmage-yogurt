@@ -1,12 +1,17 @@
 import{lookup}from'node:dns/promises'
 import{isIP}from'node:net'
 const privateAddress=(s:string)=>/^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.|::1$|f[cd]|fe80)/i.test(s)||s.startsWith('::ffff:')
+export async function assertPublicUrl(url:string|URL):Promise<URL>{
+  const current=new URL(url)
+  if(!['https:','http:'].includes(current.protocol)||current.username||current.password||current.port&&!['80','443'].includes(current.port))throw new Error('공개 웹 주소만 읽을 수 있습니다.')
+  const hosts=isIP(current.hostname)?[{address:current.hostname}]:await lookup(current.hostname,{all:true})
+  if(!hosts.length||hosts.some(h=>privateAddress(h.address)))throw new Error('내부 네트워크 주소는 읽지 않습니다.')
+  return current
+}
 export async function publicText(url:string,signal?:AbortSignal):Promise<string>{
   let current=new URL(url)
   for(let n=0;n<4;n++){
-    if(!['https:','http:'].includes(current.protocol)||current.username||current.password||current.port&& !['80','443'].includes(current.port))throw new Error('공개 웹 주소만 읽을 수 있습니다.')
-    const hosts=isIP(current.hostname)?[{address:current.hostname}]:await lookup(current.hostname,{all:true})
-    if(!hosts.length||hosts.some(h=>privateAddress(h.address)))throw new Error('내부 네트워크 주소는 읽지 않습니다.')
+    await assertPublicUrl(current)
     const response=await fetch(current,{redirect:'manual',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(20_000)]):AbortSignal.timeout(20_000),headers:{'User-Agent':'Achmage-Yogurt/0.4 (public source reading)'}})
     if(response.status>=300&&response.status<400){current=new URL(response.headers.get('location')||'',current);continue}
     if(!response.ok||!/(text\/|application\/xhtml)/i.test(response.headers.get('content-type')||''))throw new Error('웹 본문을 읽지 못했습니다.')
