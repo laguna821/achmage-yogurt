@@ -58,3 +58,6 @@ app/resources/tools/
 app/resources/python/
 app/resources/pdf/
 app/.tool-staging/
+
+# Generated standalone mobile test bundle
+app/mobile-lab-dist/

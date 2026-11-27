@@ -42,6 +42,21 @@ html[data-skin] :focus-visible { outline-color:var(--focus); }
 .markdown-preview-block blockquote { border-inline-start:3px solid var(--accent);padding-inline-start:16px;color:var(--written); }
 .markdown-preview-block img { max-width:100%; }
 .markdown-preview-block svg { max-width:100%;height:auto; }
+.record-diagram { margin:16px 0;min-width:0;position:relative;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg); }
+.diagram-toolbar { display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px; }
+.diagram-toolbar button { background:var(--control);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer; }
+.diagram-toolbar button[aria-pressed="true"] { background:var(--accent-soft); }
+.diagram-toolbar button:focus-visible { outline:2px solid var(--accent);outline-offset:2px; }
+.diagram-source-toolbar { margin:0;padding:12px 0 8px; }
+.cm-content>.record-diagram { margin:0; }
+.record-diagram [hidden] { display:none!important; }
+.record-diagram-preview { min-width:0;width:100%;overflow:auto;--pele-bg:var(--bg);--pele-fg:var(--ink);--pele-muted:var(--muted);--pele-line:var(--muted);--pele-surface:var(--card);--pele-surface-alt:var(--accent-soft);--pele-border:var(--line);--pele-accent:var(--accent);--pele-error:var(--danger);--pele-font:inherit;--pele-series-1:var(--accent);--pele-series-2:#009e91;--pele-series-3:#2463eb;--pele-series-4:#d97706; }
+.record-diagram-preview .pele-node:is(.achmage,.brand-blue,.brand-teal,.brand-navy) { --node-fill:var(--accent);--node-ink:var(--accent-ink); }
+.record-diagram-preview .pele-node.brand-blue { --node-fill:#2463eb;--node-ink:#fff; }
+.record-diagram-preview .pele-node.brand-teal { --node-fill:#007f78;--node-ink:#fff; }
+.record-diagram-preview .pele-node.brand-navy { --node-fill:#162b4d;--node-ink:#fff; }
+.record-diagram-preview .pele-node:is(.achmage,.brand-blue,.brand-teal,.brand-navy)>:is(rect,path,polygon,circle,ellipse) { fill:var(--node-fill);stroke:var(--node-fill); }
+.record-diagram-preview .pele-node:is(.achmage,.brand-blue,.brand-teal,.brand-navy) .pele-label { fill:var(--node-ink); }
 .markdown-preview-block :is(ul,ol) { padding-inline-start:26px; }
 .markdown-preview-block ul { list-style:disc; }
 .markdown-preview-block ol { list-style:decimal; }
@@ -83,7 +98,7 @@ html[data-skin] :focus-visible { outline-color:var(--focus); }
 .markdown-preview-block h1 {font-size:25px;}
 .markdown-preview-block h2 {font-size:21px;}
 .markdown-preview-block h3 {font-size:18px;}
-.markdown-editor .cm-line:has(>br:only-child) {line-height:12px;}
+/* CodeMirror source lines must share one line height for accurate caret mapping. */
 
 [data-untimed] time { display:none; }
 .import-timing-notice { padding:8px 16px; color:var(--muted); font-size:12px; }

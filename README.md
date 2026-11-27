@@ -17,7 +17,7 @@
 
 ## 설치
 
-[Releases](https://github.com/laguna821/achmage-yogurt/releases)에서 플랫폼에 맞는 파일을 받으세요. 공개 배포본은 로그인 없이 다운로드할 수 있습니다. 현재 버전은 **0.6.0-achmage.2**입니다.
+[Releases](https://github.com/laguna821/achmage-yogurt/releases)에서 플랫폼에 맞는 파일을 받으세요. 공개 배포본은 로그인 없이 다운로드할 수 있습니다. 현재 버전은 **0.6.1-achmage.1**입니다.
 
 | 플랫폼 | 파일 | 상태 |
 | --- | --- | --- |
@@ -55,3 +55,5 @@ Gmail은 설정에서 본인의 Google OAuth 데스크톱 클라이언트를 등
 ## 출처와 라이선스
 
 기반 Yogurt는 Frigade의 MIT 소프트웨어입니다. 원래 저작권 고지와 [LICENSE](LICENSE)를 유지합니다. Achmage 로고 자산과 27개 팔레트는 요청받은 참조를 사용했으며 타사 서비스의 제휴·공식 앱을 뜻하지 않습니다. 포함된 Node, CPython, Codex, FFmpeg, yt-dlp 및 라이브러리의 별도 라이선스·버전은 설치본 `resources/licenses`와 `resources/tools/manifest.json`에 있습니다. FFmpeg 정적 빌드에는 GPL/LGPL 의무가 별도로 적용됩니다.
+
+공통 라이브 편집기의 [Pele 도식·소스 편집](docs/PELE-EDITOR.md)과 [아이폰 모바일 시험 실행계획](docs/MOBILE-TEST-PLAN.md)을 참고하세요. 모바일 사전 시험 화면은 `app/mobile-lab`에 있으며 전체 음성 전사 PWA는 아직 아닙니다.

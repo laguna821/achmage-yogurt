@@ -1,6 +1,6 @@
 {
   "name": "@yogurt/app",
-  "version": "0.6.0-achmage.2",
+  "version": "0.6.1-achmage.1",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
@@ -11,7 +11,8 @@
     "e2e": "node scripts/native.mjs && electron-vite build && playwright test",
     "native": "node scripts/native.mjs",
     "typecheck": "tsc -p .",
-    "prepare:tools": "node scripts/prepare-tools.mjs"
+    "prepare:tools": "node scripts/prepare-tools.mjs",
+    "mobile:build": "vite build --config mobile-lab/vite.config.ts"
   },
   "dependencies": {
     "chrono-node": "2.10.3",
@@ -60,6 +61,7 @@
     "mermaid": "12.3.0",
     "motion": "14.4.0",
     "pdfjs-dist": "^6.5.438",
+    "pele": "1.13.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "tailwindcss": "4.3.3",

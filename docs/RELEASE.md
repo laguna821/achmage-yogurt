@@ -1,6 +1,6 @@
 # 개발·서명 없는 배포
 
-Node 24와 pnpm 10.7.0을 사용합니다. 원래 MIT 저작권 고지를 유지합니다. 현재 공개 배포 버전은 `0.6.0-achmage.2`입니다. Linux AppImage, Windows x64 EXE, macOS arm64 ZIP을 로컬에서 빌드합니다. 이번 버전의 범위와 검증은 [최종 문서 편집](FINAL-EDIT.md)을 참고하세요.
+Node 24와 pnpm 10.7.0을 사용합니다. 원래 MIT 저작권 고지를 유지합니다. 현재 공개 배포 버전은 `0.6.1-achmage.1`입니다. Linux AppImage, Windows x64 EXE, macOS arm64 ZIP을 로컬에서 빌드합니다. 이번 버전의 범위와 검증은 [Pele 편집기](PELE-EDITOR.md)와 [모바일 시험 실행계획](MOBILE-TEST-PLAN.md)을 참고하세요.
 
 ```sh
 pnpm install --frozen-lockfile

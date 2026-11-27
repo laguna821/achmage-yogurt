@@ -7,10 +7,43 @@ import { languages } from '@codemirror/language-data'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import {VIDEO_ASSET,videoAssetUrl} from '../../../shared/video'
+import { mountDiagram, diagramButton, diagramCopyButton } from './Diagram'
 
 type Mode = 'live' | 'source' | 'read'
 const refresh = StateEffect.define<null>()
-let diagramSerial=0
+const diagramSource = StateEffect.define<number | null>()
+const diagramCleanup = new WeakMap<HTMLElement, () => void>()
+
+class DiagramPreview extends WidgetType {
+  constructor(readonly source:string,readonly code:string,readonly from:number,readonly readOnly:boolean){super()}
+  eq(other:DiagramPreview){return other.source===this.source&&other.from===this.from&&other.readOnly===this.readOnly}
+  toDOM(view:EditorView){
+    const el=document.createElement('figure');el.className='record-diagram markdown-preview-block'
+    const toolbar=document.createElement('div');toolbar.className='diagram-toolbar'
+    const preview=document.createElement('div');preview.className='record-diagram-preview'
+    const raw=document.createElement('pre'),code=document.createElement('code');code.textContent=this.source;raw.append(code);raw.hidden=true
+    const toggle=diagramButton('Mermaid 소스 보기', '</>',()=>{
+      if(this.readOnly){raw.hidden=!raw.hidden;preview.hidden=!raw.hidden;toggle.setAttribute('aria-pressed',String(!raw.hidden));view.requestMeasure();return}
+      const firstLine=this.source.indexOf('\n')+1
+      view.dispatch({selection:{anchor:this.from+firstLine},effects:diagramSource.of(this.from)});view.focus()
+    });toggle.setAttribute('aria-pressed','false')
+    toolbar.append(toggle,diagramCopyButton(this.source));el.append(toolbar,preview,raw)
+    diagramCleanup.set(el,mountDiagram(preview,this.code,()=>view.requestMeasure()))
+    return el
+  }
+  destroy(dom:HTMLElement){diagramCleanup.get(dom)?.();diagramCleanup.delete(dom)}
+  ignoreEvent(){return true}
+}
+class DiagramSourceToolbar extends WidgetType {
+  constructor(readonly source:string){super()}
+  eq(other:DiagramSourceToolbar){return other.source===this.source}
+  toDOM(view:EditorView){
+    const el=document.createElement('div');el.className='diagram-toolbar diagram-source-toolbar'
+    const toggle=diagramButton('다이어그램으로 보기','</>',()=>{view.dispatch({effects:diagramSource.of(null)});view.focus()});toggle.setAttribute('aria-pressed','true')
+    el.append(toggle,diagramCopyButton(this.source));return el
+  }
+  ignoreEvent(){return true}
+}
 export function renderMarkdown(source:string):string {
   return DOMPurify.sanitize(marked.parse(source,{async:false,gfm:true}) as string,{FORBID_TAGS:['style','iframe','object','form'],FORBID_ATTR:['style']})
 }
@@ -27,32 +60,41 @@ class RenderedBlock extends WidgetType {
       const at=leaf?this.source.indexOf(leaf):-1,offset=at>=0?at+(caret?.startOffset||0):0
       e.preventDefault();view.dispatch({selection:{anchor:Math.min(this.from+offset,view.state.doc.length)},effects:refresh.of(null)});view.focus()
     })
+    const cleanup:(()=>void)[]=[]
     for(const code of el.querySelectorAll<HTMLElement>('pre code.language-mermaid')) {
-      const source=code.textContent||'', pre=code.parentElement!
-      if(source.length>20000||/%%\{|^\s*(?:click|style|classDef|linkStyle)\b|<\/?[a-z]|https?:\/\//im.test(source))continue
-      void import('mermaid').then(async({default:mermaid})=>{
-        mermaid.initialize({startOnLoad:false,securityLevel:'strict',suppressErrorRendering:true,theme:document.documentElement.dataset.mode==='dark'?'dark':'neutral',flowchart:{htmlLabels:false}})
-        const {svg}=await mermaid.render('achmage-md-'+(++diagramSerial),source)
-        if(pre.isConnected){const figure=document.createElement('figure');figure.className='record-diagram';figure.innerHTML=DOMPurify.sanitize(svg,{USE_PROFILES:{svg:true,svgFilters:true}});pre.replaceWith(figure)}
-      }).catch(()=>{/* Keep the source visible if a diagram cannot render. */})
+      const figure=document.createElement('figure');figure.className='record-diagram'
+      const preview=document.createElement('div');preview.className='record-diagram-preview';figure.append(preview)
+      code.parentElement!.replaceWith(figure);cleanup.push(mountDiagram(preview,code.textContent||'',()=>view.requestMeasure()))
     }
+    diagramCleanup.set(el,()=>cleanup.forEach(dispose=>dispose()))
     return el
   }
+  destroy(dom:HTMLElement){diagramCleanup.get(dom)?.();diagramCleanup.delete(dom)}
   ignoreEvent(){return false}
 }
 function livePreview(readOnly:boolean,meetingId?:string){
-  let cached='',blocks:{from:number;to:number;source:string}[]=[]
+  let cached='',openFrom:number|null=null,blocks:{from:number;to:number;source:string;diagram?:string}[]=[]
   const build=(state:EditorState):DecorationSet=>{
     const text=state.doc.toString()
-    if(text!==cached){cached=text;let pos=0;blocks=marked.lexer(text,{gfm:true}).flatMap(token=>{const from=pos;pos+=token.raw.length;return token.type==='space'?[]:[{from,to:pos,source:token.raw}]})}
+    if(text!==cached){cached=text;let pos=0;blocks=marked.lexer(text,{gfm:true}).flatMap(token=>{const from=pos;pos+=token.raw.length;return token.type==='space'?[]:[{from,to:pos,source:token.raw,diagram:token.type==='code'&&token.lang?.trim().toLowerCase()==='mermaid'?token.text:undefined}]})}
     const ranges:Range<Decoration>[]=[]
     for(const block of blocks){
+      if(block.diagram!==undefined){
+        const active=!readOnly&&openFrom===block.from&&state.selection.ranges.some(r=>r.from<block.to&&r.to>=block.from)
+        if(active)ranges.push(Decoration.widget({widget:new DiagramSourceToolbar(block.source),block:true,side:-1}).range(block.from))
+        else {if(openFrom===block.from)openFrom=null;ranges.push(Decoration.replace({widget:new DiagramPreview(block.source,block.diagram,block.from,readOnly),block:true}).range(block.from,block.to))}
+        continue
+      }
       const active=!readOnly&&state.selection.ranges.some(r=>r.from<=block.to&&r.to>=block.from)
       if(!active&&block.to>block.from)ranges.push(Decoration.replace({widget:new RenderedBlock(block.source,block.from,readOnly,meetingId),block:true}).range(block.from,block.to))
     }
     return Decoration.set(ranges,true)
   }
-  return StateField.define<DecorationSet>({create:build,update:(value,tr)=>tr.docChanged||tr.selection||tr.effects.some(e=>e.is(refresh))?build(tr.state):value,provide:f=>EditorView.decorations.from(f)})
+  return StateField.define<DecorationSet>({create:build,update:(value,tr)=>{
+    if(openFrom!==null&&tr.docChanged)openFrom=tr.changes.mapPos(openFrom)
+    for(const effect of tr.effects)if(effect.is(diagramSource))openFrom=effect.value
+    return tr.docChanged||tr.selection||tr.effects.some(e=>e.is(refresh)||e.is(diagramSource))?build(tr.state):value
+  },provide:f=>EditorView.decorations.from(f)})
 }
 
 /** Markdown is the document. Rendering never serializes or rewrites its bytes. */
@@ -71,7 +113,7 @@ export function Editor(p:{meetingId?:string;focus?:{match?:string;seq:number};ma
       EditorView.contentAttributes.of({'aria-label':p.label,'data-testid':p.testId,'role':'textbox','aria-multiline':'true','spellcheck':'true','dir':'auto'}),
       placeholder(p.placeholder||''),
       EditorView.updateListener.of(u=>{if(u.docChanged&&!external.current)callbacks.current.onChange?.(u.state.doc.toString())}),
-      EditorView.domEventHandlers({blur:()=>{callbacks.current.onBlur?.();return false}}),
+      EditorView.domEventHandlers({blur:(_event,editor)=>{callbacks.current.onBlur?.();queueMicrotask(()=>{if(view.current===editor&&!editor.hasFocus&&!editor.dom.contains(document.activeElement))editor.dispatch({effects:diagramSource.of(null)})});return false}}),
     ]})});view.current=v
     return()=>{callbacks.current.onBlur?.();v.destroy();view.current=undefined}
   },[p.testId])
