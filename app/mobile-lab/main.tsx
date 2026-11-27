@@ -28,7 +28,17 @@ import {
 } from "./core/organize";
 import "../src/renderer/src/achmage.css";
 import "./style.css";
-const VERSION = "모바일 베타 0.1";
+const VERSION = "모바일 베타 0.1.3";
+const appleMobile =
+  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const asrPhase = {
+  download: "모델 다운로드·검증",
+  initialize: "모델 실행 준비",
+  decode: "음성 해독",
+  transcribe: "음성을 글로 전사",
+};
+
 const hostLabel = (url: string) => {
   try {
     return new URL(url).hostname;
@@ -69,7 +79,9 @@ function App() {
     [saved, setSaved] = useState(true);
   const [file, setFile] = useState<File>(),
     [model, setModel] = useState<ModelId>("small"),
-    [device, setDevice] = useState<"webgpu" | "wasm">("webgpu"),
+    [device, setDevice] = useState<"webgpu" | "wasm">(
+      appleMobile ? "wasm" : "webgpu",
+    ),
     [language, setLanguage] = useState("korean"),
     [settings, setSettings] = useState<AISettings>(defaultAI),
     [url, setUrl] = useState(""),
@@ -139,7 +151,8 @@ function App() {
     setKey(k);
     setPassword("");
     setShowPassword(false);
-    setNotes(await listNotes(k));
+    const loadedNotes = await listNotes(k);
+    setNotes(loadedNotes);
     const config = await vault.get<{
       ai: AISettings;
       model: ModelId;
@@ -152,7 +165,15 @@ function App() {
       setDevice(config.device);
       setLanguage(config.language);
     }
-    setStatus("기록은 이 기기에 암호화해 저장됩니다.");
+    const unfinished = loadedNotes.find(
+      (n) => n.kind === "audio" && n.status === "paused" && n.model,
+    );
+    if (unfinished) {
+      await choose(unfinished);
+      setStatus(
+        "완료되지 않은 전사 기록을 열었습니다. 저장된 녹음과 완료 구간을 확인하고 이어서 진행하세요.",
+      );
+    } else setStatus("기록은 이 기기에 암호화해 저장됩니다.");
     void navigator.storage?.persist?.().catch(() => false);
   };
   const run = async (fn: (signal: AbortSignal) => Promise<void>) => {
@@ -251,6 +272,11 @@ function App() {
     setShareKey("");
     setShowRaw(false);
     setRaw("");
+    if (n.kind === "audio" && n.model && n.model in MODELS) {
+      setModel(n.model as ModelId);
+      if (n.device) setDevice(n.device);
+      if (n.language) setLanguage(n.language);
+    }
     setTab("records");
     setError("");
   };
@@ -321,14 +347,20 @@ function App() {
       } else if (n.recording?.parts) {
         input = recordedSource(key!, n.id, n.recording.sizes);
       } else throw Error("먼저 음성 파일을 선택하세요.");
-      if (
-        n.next &&
-        (n.model !== model || n.device !== device || n.language !== language)
-      )
+      if (n.next && (n.model !== model || n.language !== language))
         throw Error(
-          "이어 전사할 때는 처음 선택한 모델·실행 방식·언어를 유지하세요.",
+          "이어 전사할 때는 처음 선택한 모델·언어를 유지하세요. 실행 방식은 CPU로 바꿀 수 있습니다.",
         );
       const audio = await openAudio(input);
+      const stage = async (phase: NonNullable<Note["asrAttempt"]>["phase"]) => {
+        signal.throwIfAborted();
+        n = {
+          ...n,
+          asrAttempt: { phase, state: "running", at: Date.now() },
+          updated: Date.now(),
+        };
+        await persist(n);
+      };
       try {
         n = {
           ...n,
@@ -339,12 +371,16 @@ function App() {
           status: "paused",
           error: undefined,
         };
-        await persist(n);
-        setStatus("모델 준비 중… 처음에는 파일을 다운로드합니다.");
+        await stage("download");
+        setStatus(
+          "1/3 모델 다운로드·검증 중 · 아직 전사를 시작하지 않았습니다.",
+        );
+        let initializing = false;
         const asr = new Asr((p) => {
+          if (initializing) return;
           if (p.status === "progress")
             setStatus(
-              "모델 준비 · " +
+              "1/3 다운로드·검증 · " +
                 (p.file || "") +
                 " " +
                 Math.round(p.progress || 0) +
@@ -354,7 +390,13 @@ function App() {
             setStatus("모델 파일 확인 · " + p.file);
         });
         engine.current = asr;
-        const loaded = await asr.load(model, device);
+        const loaded = await asr.load(model, device, async () => {
+          initializing = true;
+          await stage("initialize");
+          setStatus(
+            "2/3 다운로드 완료 · 모델을 메모리에 불러오는 중입니다. 아직 전사 완료가 아닙니다.",
+          );
+        });
         setReport((r) => [
           ...r,
           { stage: "model-load", model, device, ...loaded },
@@ -365,15 +407,19 @@ function App() {
           index++
         ) {
           signal.throwIfAborted();
+          await stage("decode");
           setStatus(
-            `전사 ${index + 1}/${Math.ceil(audio.duration / CHUNK_SECONDS)} · 완료한 구간부터 자동 저장`,
+            `3/3 전사 ${index + 1}/${Math.ceil(audio.duration / CHUNK_SECONDS)} · 완료한 구간부터 자동 저장`,
           );
           const { pcm, start, end } = await audio.chunk(index, signal);
           let output: { text: string; ms: number };
           let energy = 0;
           for (const v of pcm) energy += v * v;
           if (energy / pcm.length < 1e-9) output = { text: "", ms: 0 };
-          else output = await asr.transcribe(pcm, language);
+          else {
+            await stage("transcribe");
+            output = await asr.transcribe(pcm, language);
+          }
           signal.throwIfAborted();
           n = await checkpoint(key!, n, {
             index,
@@ -395,10 +441,29 @@ function App() {
             },
           ]);
         }
-        await persist({ ...n, status: "done", error: undefined });
+        await persist({
+          ...n,
+          status: "done",
+          error: undefined,
+          asrAttempt: undefined,
+        });
         setStatus(
           "전사를 마쳤습니다. 원문을 검토하고 자료를 더한 뒤 정리하세요.",
         );
+      } catch (e) {
+        if (n.asrAttempt) {
+          n = {
+            ...n,
+            status: "paused",
+            asrAttempt: {
+              ...n.asrAttempt,
+              state: signal.aborted ? "paused" : "error",
+            },
+            error: signal.aborted ? undefined : errorText(e),
+          };
+          await persist(n);
+        }
+        throw e;
       } finally {
         audio.close();
       }
@@ -1023,9 +1088,11 @@ function App() {
                   {new Date(n.updated).toLocaleString("ko-KR")} ·{" "}
                   {n.md
                     ? "정리됨"
-                    : n.next
-                      ? "전사 " + n.next + "구간"
-                      : "준비 중"}
+                    : n.status === "paused"
+                      ? "전사 미완료 · 저장 " + n.next + "구간"
+                      : n.next
+                        ? "전사 " + n.next + "구간"
+                        : "준비 중"}
                   {n.error ? " · 확인 필요" : ""}
                 </small>
               </button>
@@ -1072,11 +1139,97 @@ function App() {
           {note.kind === "audio" && (
             <section className="card">
               <h2>기기에서 전사</h2>
+              {note.status === "paused" && !busy && (
+                <section className="notice">
+                  <div>
+                    <strong>전사가 완료되지 않았습니다</strong>
+                    <p>
+                      {note.asrAttempt
+                        ? `마지막 저장 단계: ${asrPhase[note.asrAttempt.phase]}`
+                        : "이전 전사가 완료되기 전에 중단되었습니다."}{" "}
+                      · 완료한 구간 {note.next}개
+                    </p>
+                    <p>
+                      {note.recording?.parts
+                        ? "녹음은 이 기기에 남아 있습니다. 다시 녹음할 필요 없이 이어서 전사할 수 있습니다."
+                        : "가져왔던 원본 파일을 다시 선택하면 완료 구간 다음부터 이어갑니다."}
+                    </p>
+                    {note.asrAttempt?.state === "running" && (
+                      <p>
+                        페이지가 다시 열리며 작업이 중단된 것으로 보입니다.
+                        정확한 종료 원인은 아직 확인되지 않았습니다.
+                      </p>
+                    )}
+                    {note.error && <p role="alert">{note.error}</p>}
+                    <button
+                      onClick={() =>
+                        void copy(
+                          JSON.stringify(
+                            {
+                              version: VERSION,
+                              userAgent: navigator.userAgent,
+                              model: note.model,
+                              device: note.device,
+                              attempt: note.asrAttempt,
+                              completedChunks: note.next,
+                              duration: note.duration,
+                            },
+                            null,
+                            2,
+                          ),
+                        )
+                      }
+                    >
+                      중단 진단 복사
+                    </button>
+                  </div>
+                </section>
+              )}
               <p>
                 {MODELS[model].label} · 첫 다운로드 {MODELS[model].download}
                 <br />
                 {MODELS[model].hint}
+                <br />
+                실행 방식:{" "}
+                {device === "wasm" ? "CPU (WASM)" : "GPU (WebGPU · 실험)"}
               </p>
+              {appleMobile && (
+                <p className="meta">
+                  iPhone에서는 CPU를 기본으로 사용합니다. GPU 지원 표시만으로
+                  전사 안정성이 보장되지는 않습니다. 다운로드 용량과 실행 중
+                  메모리 사용량은 다릅니다.
+                </p>
+              )}
+              {note.status !== "done" && !busy && (
+                <div className="controls">
+                  {model !== "turbo" && device === "webgpu" && (
+                    <button
+                      onClick={() => {
+                        setDevice("wasm");
+                        setStatus(
+                          "같은 모델을 CPU로 실행하도록 선택했습니다. 아래 전사 버튼을 누르세요. 모델 파일은 캐시가 남아 있으면 다시 다운로드하지 않습니다.",
+                        );
+                      }}
+                    >
+                      같은 모델 · CPU로 전환
+                    </button>
+                  )}
+                  {note.next === 0 &&
+                    (model !== "tiny" || device !== "wasm") && (
+                      <button
+                        onClick={() => {
+                          setModel("tiny");
+                          setDevice("wasm");
+                          setStatus(
+                            "Tiny + CPU를 선택했습니다. 한국어 정확도가 낮은 동작 확인용입니다. 아래 전사 버튼을 누르면 약 41 MB 모델을 준비합니다.",
+                          );
+                        }}
+                      >
+                        가벼운 동작 확인 · Tiny + CPU
+                      </button>
+                    )}
+                </div>
+              )}
               {!note.recording && note.status !== "done" && (
                 <label>
                   원본 파일{note.next > 0 ? " 다시 선택 (이어 전사)" : ""}

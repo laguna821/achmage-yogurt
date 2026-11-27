@@ -37,7 +37,13 @@ export class Asr {
       this.worker.postMessage({ id, action, ...args }, transfer);
     });
   }
-  load(model: ModelId, device: "webgpu" | "wasm") {
+  async load(
+    model: ModelId,
+    device: "webgpu" | "wasm",
+    beforeInitialize?: () => Promise<void>,
+  ) {
+    await this.call("prepare", { model, device });
+    await beforeInitialize?.();
     return this.call("load", { model, device });
   }
   transcribe(pcm: Float32Array, language: string) {

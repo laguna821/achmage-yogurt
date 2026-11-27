@@ -30,6 +30,11 @@ export type Note = {
     complete: boolean;
   };
   aiParts?: number;
+  asrAttempt?: {
+    phase: "download" | "initialize" | "decode" | "transcribe";
+    state: "running" | "paused" | "error";
+    at: number;
+  };
 };
 export const noteId = () => crypto.randomUUID();
 export async function listNotes(key: CryptoKey) {

@@ -10,7 +10,7 @@ let transcriber: any;
 self.onmessage = async (event: MessageEvent) => {
   const { id, action, model, device, pcm, language } = event.data;
   try {
-    if (action === "load") {
+    if (action === "prepare" || action === "load") {
       const m = MODELS[model as ModelId];
       if (!m) throw Error("알 수 없는 모델입니다.");
       if (device === "webgpu") {
@@ -25,9 +25,16 @@ self.onmessage = async (event: MessageEvent) => {
         throw Error("Turbo는 WebGPU 모드에서만 시험할 수 있습니다.");
       env.customCache = await caches.open(modelCacheName);
       const start = performance.now();
-      await prepareWeights(model, (progress) =>
-        self.postMessage({ id, progress }),
-      );
+      if (action === "prepare") {
+        await prepareWeights(model, (progress) =>
+          self.postMessage({ id, progress }),
+        );
+        self.postMessage({
+          id,
+          result: { prepareMs: performance.now() - start },
+        });
+        return;
+      }
       transcriber = await pipeline("automatic-speech-recognition", m.repo, {
         device,
         dtype: m.dtype as any,
