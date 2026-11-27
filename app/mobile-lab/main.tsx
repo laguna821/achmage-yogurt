@@ -57,6 +57,7 @@ function App() {
     ),
     [key, setKey] = useState<CryptoKey>(),
     [password, setPassword] = useState(""),
+    [showPassword, setShowPassword] = useState(false),
     [recoveryMode, setRecoveryMode] = useState(false),
     [recovery, setRecovery] = useState("");
   const [notes, setNotes] = useState<Note[]>([]),
@@ -137,6 +138,7 @@ function App() {
     keyRef.current = k;
     setKey(k);
     setPassword("");
+    setShowPassword(false);
     setNotes(await listNotes(k));
     const config = await vault.get<{
       ai: AISettings;
@@ -569,6 +571,28 @@ function App() {
       전송합니다.
     </footer>
   );
+  const updateNotice = update && (
+    <section className="notice">
+      <p>
+        {recovery
+          ? "복구 키 보관을 마친 뒤 업데이트할 수 있습니다."
+          : "새 버전이 준비되었습니다."}
+      </p>
+      <button
+        disabled={busy || !saved || !!recovery}
+        onClick={() => {
+          navigator.serviceWorker.addEventListener(
+            "controllerchange",
+            () => location.reload(),
+            { once: true },
+          );
+          update.postMessage("ACTIVATE");
+        }}
+      >
+        {key ? "저장 후 업데이트" : "새 버전 열기"}
+      </button>
+    </section>
+  );
   if (!key)
     return (
       <main className="locked">
@@ -579,14 +603,28 @@ function App() {
             <p>음성을 기록으로, 기록을 내 지식으로.</p>
           </div>
         </header>
-        <section className="card">
+        {updateNotice}
+        <section className="card onboarding">
+          {header === null && (
+            <p className="setup-step">1 / 2 · 새 잠금 암호 정하기</p>
+          )}
           <h2>
-            {header === null ? "나만의 기록함 만들기" : "기록함 잠금 해제"}
+            {header === undefined
+              ? "기록함 확인 중…"
+              : header === null
+                ? "처음이신가요? 여기서 시작하세요"
+                : "기록함 잠금 해제"}
           </h2>
           <p>
-            기록과 AI 연결 키를 이 기기에 암호화해 저장합니다. 웹 주소에는 개인
-            기록이 들어 있지 않습니다.
+            {header === null
+              ? "회원가입 없이 시작합니다. 이 기기의 기록을 보호할 새 암호를 직접 정해 주세요. GitHub·Apple 계정 비밀번호를 입력하는 곳이 아닙니다."
+              : "이 기기에서 기록함을 만들 때 정한 암호를 입력하세요."}
           </p>
+          {header === null && (
+            <p className="meta">
+              새 암호 설정 → 복구 키 보관 → 녹음·파일 가져오기
+            </p>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -597,6 +635,8 @@ function App() {
                   setHeader(created.header);
                   setRecovery(created.recovery);
                   await enter(created.key);
+                  setStatus("");
+                  setTab("new");
                 } else if (header)
                   await enter(
                     await vault.unlock(header, password, recoveryMode),
@@ -604,22 +644,66 @@ function App() {
               });
             }}
           >
-            <label>
-              {recoveryMode ? "복구 키" : "잠금 암호"}
-              <input
-                autoComplete={
-                  header === null ? "new-password" : "current-password"
-                }
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+            <label htmlFor="vault-password">
+              {recoveryMode
+                ? "복구 키"
+                : header === null
+                  ? "새 잠금 암호"
+                  : "잠금 암호"}
             </label>
-            <button className="primary" disabled={busy || header === undefined}>
-              {header === null ? "기록함 만들기" : "잠금 해제"}
+            <input
+              id="vault-password"
+              aria-describedby="password-help"
+              placeholder={
+                recoveryMode
+                  ? "보관한 복구 키를 붙여넣으세요"
+                  : header === null
+                    ? "기억할 수 있는 암호를 10자 이상 입력"
+                    : "이 기기에서 정한 암호"
+              }
+              minLength={header === null && !recoveryMode ? 10 : undefined}
+              autoCapitalize="none"
+              spellCheck={false}
+              autoComplete={
+                header === null ? "new-password" : "current-password"
+              }
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <p id="password-help" className="meta">
+              {recoveryMode
+                ? "복구 키로도 기록함을 열 수 있습니다."
+                : header === null
+                  ? "10자 이상이면 됩니다. 다음에 이 기기의 기록함을 열 때도 이 암호를 씁니다."
+                  : "암호가 기억나지 않으면 아래에서 복구 키 사용을 선택하세요."}
+            </p>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={showPassword}
+                onChange={(e) => setShowPassword(e.target.checked)}
+              />
+              입력한 {recoveryMode ? "복구 키" : "암호"} 보기
+            </label>
+            <button
+              className="primary setup-next"
+              disabled={busy || header === undefined}
+            >
+              {busy
+                ? "기록함 여는 중…"
+                : header === null
+                  ? "이 암호로 시작하기"
+                  : "잠금 해제"}
             </button>
           </form>
+          {header === null && (
+            <p className="meta">
+              기록은 이 기기에 암호화해 저장됩니다. 다른 기기로 자동 동기화되지
+              않습니다.
+            </p>
+          )}
           {header && (
             <label className="check">
               <input
@@ -631,10 +715,12 @@ function App() {
             </label>
           )}
           <details>
-            <summary>백업에서 복원</summary>
+            <summary>이미 백업 파일이 있나요?</summary>
             <p>
-              현재 기기의 기록함을 백업 내용으로 교체합니다. 앱에서 녹음한
-              음성도 복원합니다. 가져온 외부 원본 파일은 다시 선택해야 합니다.
+              처음 시작한다면 이 항목은 건너뛰세요. 백업이 있다면 위 입력란에
+              백업을 만들 때 쓴 암호를 입력하세요. 현재 기기의 기록함을 백업
+              내용으로 교체합니다. 앱에서 녹음한 음성도 복원합니다. 가져온 외부
+              원본 파일은 다시 선택해야 합니다.
             </p>
             <input
               aria-label="복원할 백업"
@@ -674,8 +760,10 @@ function App() {
   if (recovery)
     return (
       <main className="locked">
-        <section className="card">
-          <h1>복구 키를 보관하세요</h1>
+        {updateNotice}
+        <section className="card onboarding">
+          <p className="setup-step">2 / 2 · 복구 키 보관하기</p>
+          <h1>이제 복구 키만 보관하면 됩니다</h1>
           <p>
             암호를 잊었을 때 필요한 키입니다. 암호 관리자 등 다른 안전한 곳에
             보관하세요. 이 키만으로 사라진 기기 데이터를 되살릴 수는 없으므로
@@ -683,8 +771,21 @@ function App() {
           </p>
           <textarea readOnly aria-label="새 기록함 복구 키" value={recovery} />
           <button onClick={() => void copy(recovery)}>복구 키 복사</button>
-          <button className="primary" onClick={() => setRecovery("")}>
-            복구 키를 보관했어요
+          <p className="meta">
+            복사한 키를 암호 관리자 등 안전한 곳에 붙여넣어 보관한 뒤, 아래
+            버튼을 누르세요.
+          </p>
+          {status && <p role="status">{status}</p>}
+          <button
+            className="primary setup-next"
+            onClick={() => {
+              setRecovery("");
+              setStatus(
+                "준비가 끝났습니다. 아래에서 마이크로 녹음하거나 가지고 있는 파일을 선택하세요. AI 연결은 나중에 설정해도 됩니다.",
+              );
+            }}
+          >
+            보관했어요 · 녹음 시작 화면으로
           </button>
         </section>
         {error && <p role="alert">{error}</p>}
@@ -753,24 +854,7 @@ function App() {
           </button>
         </section>
       )}
-      {update && (
-        <section className="notice">
-          업데이트가 준비되었습니다.{" "}
-          <button
-            disabled={busy || !saved}
-            onClick={() => {
-              update.postMessage("ACTIVATE");
-              navigator.serviceWorker.addEventListener(
-                "controllerchange",
-                () => location.reload(),
-                { once: true },
-              );
-            }}
-          >
-            저장 후 업데이트
-          </button>
-        </section>
-      )}
+      {updateNotice}
       {(status || error) && (
         <section className={error ? "notice error" : "notice"}>
           <p role={error ? "alert" : "status"}>{error || status}</p>

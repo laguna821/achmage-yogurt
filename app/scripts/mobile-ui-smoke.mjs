@@ -55,12 +55,31 @@ await page.route(
 );
 try {
   await page.goto(process.env.YOGURT_TEST_URL || "http://127.0.0.1:5188/");
-  await page.getByLabel("잠금 암호", { exact: true }).fill("mobile-ui-12345");
+  await expect(page.getByText("1 / 2 · 새 잠금 암호 정하기")).toBeVisible();
+  const password = page.getByLabel("새 잠금 암호", { exact: true });
+  await password.fill("short");
   await page
-    .getByRole("button", { name: "기록함 만들기", exact: true })
+    .getByRole("button", { name: "이 암호로 시작하기", exact: true })
     .click();
-  await page.getByRole("button", { name: "복구 키를 보관했어요" }).click();
-  await page.getByRole("button", { name: "새로 가져오기" }).click();
+  await expect(password).toBeVisible();
+  if (await password.evaluate((input) => input.validity.valid))
+    throw Error("short password accepted");
+  await page.getByLabel("입력한 암호 보기").check();
+  await expect(password).toHaveAttribute("type", "text");
+  await password.fill("mobile-ui-12345");
+  await page.getByLabel("입력한 암호 보기").uncheck();
+  await page.screenshot({ path: OUT + "/onboarding.png", fullPage: true });
+  await page
+    .getByRole("button", { name: "이 암호로 시작하기", exact: true })
+    .click();
+  await page.getByRole("button", { name: "복구 키 복사", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("복사했습니다.");
+  await page
+    .getByRole("button", { name: "보관했어요 · 녹음 시작 화면으로" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "마이크로 녹음 시작" }),
+  ).toBeVisible();
   await page
     .locator("textarea")
     .fill(

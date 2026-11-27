@@ -396,3 +396,22 @@ footer {
     width: 48px;
   }
 }
+
+.setup-step {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+.onboarding .setup-next {
+  display: block;
+  width: 100%;
+  margin: 16px 0 0;
+}
+.onboarding .meta {
+  font-size: 14px;
+}
+@media (max-width: 600px) {
+  main.locked {
+    padding-top: 24px;
+  }
+}
