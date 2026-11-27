@@ -12,7 +12,8 @@
     "native": "node scripts/native.mjs",
     "typecheck": "tsc -p .",
     "prepare:tools": "node scripts/prepare-tools.mjs",
-    "mobile:build": "vite build --config mobile-lab/vite.config.ts"
+    "mobile:build": "vite build --config mobile-lab/vite.config.ts",
+    "mobile:test": "vitest run test/mobile.test.ts"
   },
   "dependencies": {
     "chrono-node": "2.10.3",
@@ -32,6 +33,7 @@
     "@electron/fuses": "1.8.0",
     "@electron/osx-sign": "1.3.3",
     "@floating-ui/dom": "1.8.0",
+    "@huggingface/transformers": "3.8.1",
     "@lezer/markdown": "^1.8.1",
     "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "4.3.3",
@@ -54,10 +56,12 @@
     "electron-vite": "6.0.0",
     "ffmpeg-static": "^5.3.0",
     "ffprobe-static": "^3.1.0",
+    "hash-wasm": "4.13.0",
     "lucide-react": "1.49.0",
     "mailparser": "^3.15.0",
     "mammoth": "^1.13.0",
     "marked": "^18.2.1",
+    "mediabunny": "1.66.5",
     "mermaid": "12.3.0",
     "motion": "14.4.0",
     "pdfjs-dist": "^6.5.438",

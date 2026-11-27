@@ -1,0 +1,5 @@
+const VERSION=__VERSION__,ASSETS=__ASSETS__;
+self.addEventListener('install',event=>event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(ASSETS))));
+self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('achmage-yogurt-shell-')&&k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener('message',event=>{if(event.data==='ACTIVATE')self.skipWaiting()});
+self.addEventListener('fetch',event=>{const url=new URL(event.request.url);if(event.request.method!=='GET'||url.origin!==self.location.origin)return;const path=url.pathname.slice(new URL(self.registration.scope).pathname.length);if(!(path===''||path==='index.html'||path==='manifest.webmanifest'||path==='icon.svg'||path==='icon-512.png'||path==='apple-touch-icon.png'||path.startsWith('assets/')||path.startsWith('ort/')))return;event.respondWith(caches.open(VERSION).then(async cache=>(await cache.match(event.request))||fetch(event.request)))});
