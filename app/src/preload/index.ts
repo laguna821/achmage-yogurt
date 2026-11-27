@@ -256,6 +256,8 @@ const api: YogurtApi = {
     show: () => { ipcRenderer.send('backup:show') },
   },
   settings: {
+    setCloseBehavior: (value) => ipcRenderer.invoke('settings:close-behavior', value),
+    quit: () => ipcRenderer.invoke('settings:quit'),
     get: () => ipcRenderer.invoke('settings:get'),
     setTheme: (v) => ipcRenderer.invoke('settings:theme', v),
     setShowInMenuBar: (on) => ipcRenderer.invoke('settings:menu-bar', on),

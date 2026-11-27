@@ -3,7 +3,7 @@ import type { BrowserWindow } from 'electron'
 import { expect, it, vi } from 'vitest'
 import { closeAction, keepMainWindow } from '../src/main/mainWindow'
 
-function fixture(background = false, more: { closeTo?(): 'hide' | 'minimize'; glass?: boolean; lift?: boolean } = {}) {
+function fixture(background = false, more: { closeTo?(): 'quit' | 'hide' | 'minimize'; requestQuit?(): void; glass?: boolean; lift?: boolean } = {}) {
   let quitting = false
   const window = Object.assign(new EventEmitter(), {
     isDestroyed: vi.fn(() => false), isMinimized: vi.fn(() => false),
@@ -54,8 +54,8 @@ it('cancels an unpainted show when closed, and never shows background or destroy
 })
 
 it('Windows and Linux without a tray icon minimise on close, so Yogurt never runs out of sight; with one they hide like a Mac', () => {
-  expect(['darwin', 'win32', 'linux'].map(os => closeAction(os, true))).toEqual(['hide', 'hide', 'hide'])
-  expect(['darwin', 'win32', 'linux'].map(os => closeAction(os, false))).toEqual(['hide', 'minimize', 'minimize'])
+  expect(['darwin', 'win32', 'linux'].map(os => closeAction(os, true, 'background'))).toEqual(['hide', 'hide', 'hide'])
+  expect(['darwin', 'win32', 'linux'].map(os => closeAction(os, false, 'background'))).toEqual(['hide', 'minimize', 'minimize'])
   const { window } = fixture(false, { closeTo: () => 'minimize' })
   const event = { preventDefault: vi.fn() }
   window.emit('close', event)
@@ -88,4 +88,15 @@ it('a plain show, Windows and Linux never float the window', () => {
   const other = fixture()
   other.window.emit('ready-to-show'); other.show(true)
   expect(other.window.setAlwaysOnTop).not.toHaveBeenCalled()
+})
+
+it('defaults to full quit on Windows/Linux and routes close through the save gate without hiding', () => {
+  expect(['darwin','win32','linux'].map(os=>closeAction(os,true))).toEqual(['hide','quit','quit'])
+  expect(closeAction('darwin',true,'quit')).toBe('quit')
+  const requestQuit=vi.fn(), {window,quit}=fixture(false,{closeTo:()=> 'quit',requestQuit})
+  const event={preventDefault:vi.fn()};window.emit('close',event)
+  expect(event.preventDefault).toHaveBeenCalledOnce();expect(requestQuit).toHaveBeenCalledOnce()
+  expect(window.hide).not.toHaveBeenCalled();expect(window.minimize).not.toHaveBeenCalled()
+  quit();window.emit('close',{preventDefault:vi.fn()})
+  expect(requestQuit).toHaveBeenCalledOnce()
 })

@@ -14,6 +14,8 @@ export type Settings = { asrModel?: string; vaultPath?: string; appearance?: { l
   setupDismissed?: import('./permissions').PermissionKind[]
   /** opens when the Mac starts; off unless the person said yes */
   openAtLogin?: boolean
+  /** Native close / Alt+F4: quit through the save gate, or retain the background recorder. */
+  closeBehavior?: import('./mainWindow').CloseBehavior
   /** the native menu bar icon; on unless turned off */
   showInMenuBar?: boolean
   /** the Dock icon; on unless turned off */

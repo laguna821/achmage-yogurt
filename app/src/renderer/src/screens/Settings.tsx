@@ -30,7 +30,7 @@ const trayLabel = () => window.yogurt.os === 'win32' ? t('Show Yogurt in the not
 export function Settings({ revision = 0, focus }: { revision?: number; focus?: string }) {
   const [section, setSection] = useState(() => window.yogurt.fake ? 'general' : sessionStorage.getItem('settings-section') || 'general')
   const [perms, setPerms] = useState<PermissionStatus>()
-  const [prefs, setPrefs] = useState<{ theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; appVisibility: AppVisibility; myName: string; macName: string; stopWhenCallEnds: boolean; recordingReminder: boolean; keepRecordings: boolean }>()
+  const [prefs, setPrefs] = useState<{ closeBehavior: 'quit' | 'background'; theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; appVisibility: AppVisibility; myName: string; macName: string; stopWhenCallEnds: boolean; recordingReminder: boolean; keepRecordings: boolean }>()
   const [name, setName] = useState('')
   const [generalReady, setGeneralReady] = useState(false)
   const scroll = useScrollMemory<HTMLDivElement>('settings', !!prefs && !!perms)
@@ -130,6 +130,17 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
               <button data-testid="menu-bar-toggle" role="switch" aria-checked={!!prefs?.showInMenuBar} aria-label={trayLabel()} onClick={menuBar}
                 className="settings-toggle"><span className="settings-toggle-knob" /></button>
             </div>}
+            <div className="settings-row">
+              <div className="settings-row-copy">
+                <label htmlFor="close-behavior" className="settings-label">창 닫을 때</label>
+                <p className="settings-description">닫기 버튼과 Alt+F4에 적용됩니다. 완전히 종료하면 메모를 저장하고 녹음을 마친 뒤 앱을 종료합니다.</p>
+              </div>
+              <select id="close-behavior" data-testid="close-behavior" className="settings-select" value={prefs?.closeBehavior ?? 'quit'} disabled={!prefs}
+                onChange={async e => { const value = e.target.value as 'quit' | 'background'; await window.yogurt.settings.setCloseBehavior(value); setPrefs(p => p && { ...p, closeBehavior: value }) }}>
+                <option value="quit">완전히 종료</option><option value="background">백그라운드 유지</option>
+              </select>
+              <button data-testid="quit-app" className="workspace-button" onClick={() => void window.yogurt.settings.quit()}>지금 완전히 종료</button>
+            </div>
             <div className="settings-row">
               <div className="settings-row-copy">
                 <p className="settings-label">{t('Finish recording when the call ends')}</p>

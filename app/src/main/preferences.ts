@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron'
 import { loadSettings, localeOf, recordingReminderOn, spokenSetting, stopsWhenCallEnds, updateSettings, visibilityOf, summaryLanguageSetting } from './settings'
 import { systemLocale } from './locale'
 import { PERMISSION_KINDS, type PermissionKind, type Permissions } from './permissions'
@@ -7,6 +7,7 @@ import type { OnboardingPlan } from '../shared/types'
 import { cleanJargon } from '../shared/jargon'
 import { isLocale, setLanguage } from '../shared/i18n'
 import { SPOKEN, type Spoken } from '../shared/spoken'
+import { defaultCloseBehavior } from './mainWindow'
 
 const isKind = (k: unknown): k is PermissionKind => PERMISSION_KINDS.includes(k as PermissionKind)
 
@@ -51,8 +52,12 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
     // what the Mac says, so a change in System Settings shows here
     // locale: every window (main, card, widget) shows the interface language
     // language: the one picked ('' is the Mac's); locale: the one in use; systemLocale: the Mac's, for the picker
-    return { theme: s.theme ?? 'system', openAtLogin: d.loginOn(s.openAtLogin), showInMenuBar: s.showInMenuBar !== false, appVisibility: !visible.showInMenuBar ? 'dock' : visible.showInDock ? 'both' : 'menu-bar', language: isLocale(s.language) ? s.language : '', locale: localeOf(s, systemLocale()), systemLocale: systemLocale(), myName: s.myName?.trim() || d.macName(), macName: d.macName(), stopWhenCallEnds: stopsWhenCallEnds(s), recordingReminder: recordingReminderOn(s), keepRecordings: s.keepRecordings !== false, jargon: cleanJargon(s.jargon), spoken: spokenSetting(s), summaryLanguage: summaryLanguageSetting(s) }
+    return { closeBehavior: s.closeBehavior ?? defaultCloseBehavior(os), theme: s.theme ?? 'system', openAtLogin: d.loginOn(s.openAtLogin), showInMenuBar: s.showInMenuBar !== false, appVisibility: !visible.showInMenuBar ? 'dock' : visible.showInDock ? 'both' : 'menu-bar', language: isLocale(s.language) ? s.language : '', locale: localeOf(s, systemLocale()), systemLocale: systemLocale(), myName: s.myName?.trim() || d.macName(), macName: d.macName(), stopWhenCallEnds: stopsWhenCallEnds(s), recordingReminder: recordingReminderOn(s), keepRecordings: s.keepRecordings !== false, jargon: cleanJargon(s.jargon), spoken: spokenSetting(s), summaryLanguage: summaryLanguageSetting(s) }
   })
+  ipcMain.handle('settings:close-behavior', (_e, value: unknown) => {
+    if (value === 'quit' || value === 'background') updateSettings(d.file, { closeBehavior: value })
+  })
+  ipcMain.handle('settings:quit', () => { setImmediate(() => app.quit()) })
   // what the person is called in meetings (who "You" is when naming voices); blank: the Mac's full name again
   ipcMain.handle('settings:name', (_e, v: unknown) => {
     if (typeof v !== 'string') return
@@ -124,4 +129,3 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
     d.setLogin(yes)
   })
 }
-
