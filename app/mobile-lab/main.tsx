@@ -993,7 +993,7 @@ function App() {
                 <br />
                 {MODELS[model].hint}
               </p>
-              {!note.recording && (
+              {!note.recording && note.status !== "done" && (
                 <label>
                   원본 파일{note.next > 0 ? " 다시 선택 (이어 전사)" : ""}
                   <input
@@ -1021,7 +1021,11 @@ function App() {
                   }
                   onClick={transcribe}
                 >
-                  {note.next ? "이어 전사하기" : "기기에서 전사 시작"}
+                  {note.status === "done"
+                    ? "전사 완료"
+                    : note.next
+                      ? "이어 전사하기"
+                      : "기기에서 전사 시작"}
                 </button>
                 <button disabled={busy} onClick={() => setTab("settings")}>
                   모델 설정
@@ -1029,8 +1033,9 @@ function App() {
               </div>
               {note.duration && (
                 <p>
-                  전체 {Math.round(note.duration / 60)}분 · 저장한 구간{" "}
-                  {note.next}/{Math.ceil(note.duration / CHUNK_SECONDS)}
+                  전체 {Math.floor(Math.round(note.duration) / 60)}분{" "}
+                  {Math.round(note.duration) % 60}초 · 저장한 구간 {note.next}/
+                  {Math.ceil(note.duration / CHUNK_SECONDS)}
                 </p>
               )}
               <small>
