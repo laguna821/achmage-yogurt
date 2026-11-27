@@ -5,7 +5,7 @@ import { copyFile } from 'node:fs/promises'
 import { basename,extname,join } from 'node:path'
 import type { Store } from '../store'
 import { importMaterial } from '../organizer/runtime'
-import { MEDIA_EXTS,TRANSCRIPT_EXTS,parseTranscript,youtubeUrl,type ImportFile,type ImportJob,type ImportRequest,type ImportStage } from '../../shared/imports'
+import { MEDIA_EXTS,TRANSCRIPT_EXTS,isImportFinished,parseTranscript,youtubeUrl,type ImportFile,type ImportJob,type ImportRequest,type ImportStage } from '../../shared/imports'
 import { command,ffmpegDecode,mediaTool } from './tools'
 import { downloadYouTube, youtubeImportError } from './youtube'
 import { videoOptions, type VideoOptions } from '../../shared/video'
@@ -51,7 +51,15 @@ export class ImportManager {
     this.save(j,'queued',j.message);this.kick();return structuredClone(j)
   }
   cancel(id:string){const j=this.jobs.get(id);if(!j||j.stage==='done')return;if(this.current?.id===id)this.current.abort.abort();this.save(j,'cancelled','작업을 중단했습니다. 원본과 완료된 단계는 남아 있습니다.')}
-  retry(id:string){const j=this.jobs.get(id);if(!j||this.current?.id===id||j.stage==='done')return;this.save(j,'queued','완료된 파일을 재사용해 다시 시작합니다.');this.kick()}
+  dismiss(id:string){
+    const j=this.jobs.get(id)
+    if(!j||j.dismissedAt)return
+    if(!isImportFinished(j.stage)||this.current?.id===id)throw new Error('진행 중인 작업은 끝난 뒤 내역을 지울 수 있습니다.')
+    j.dismissedAt=Date.now()
+    this.save(j,j.stage,j.message)
+  }
+  dismissFinished(){for(const j of this.jobs.values())if(isImportFinished(j.stage)&&this.current?.id!==j.id)this.dismiss(j.id)}
+  retry(id:string){const j=this.jobs.get(id);if(!j||this.current?.id===id||j.stage==='done')return;delete j.dismissedAt;this.save(j,'queued','완료된 파일을 재사용해 다시 시작합니다.');this.kick()}
   kick(){if(this.scheduled)return;this.scheduled=true;queueMicrotask(()=>{this.scheduled=false;void this.runNext()})}
   private async runNext(){
     if(this.current||this.d.recording())return
@@ -142,6 +150,8 @@ export function hookImports(d:Deps){
   ipcMain.handle('imports:start',(_e,raw:ImportRequest)=>manager.add(raw))
   ipcMain.handle('imports:cancel',(_e,id:unknown)=>{if(typeof id==='string')manager.cancel(id)})
   ipcMain.handle('imports:retry',(_e,id:unknown)=>{if(typeof id==='string')manager.retry(id)})
+  ipcMain.handle('imports:dismiss',(_e,id:unknown)=>{if(typeof id==='string')manager.dismiss(id)})
+  ipcMain.handle('imports:dismiss-finished',()=>manager.dismissFinished())
   ipcMain.handle('imports:tools',async()=>Promise.all((['ffmpeg','ffprobe','yt-dlp'] as const).map(async name=>{try{return {name,ready:true,version:(await command(mediaTool(name),[name==='yt-dlp'?'--version':'-version'])).split('\n')[0]}}catch{return {name,ready:false,version:'설치본의 미디어 도구를 준비하세요.'}}})))
   const timer=setInterval(()=>manager.kick(),5000);timer.unref();app.on('will-quit',()=>clearInterval(timer));return manager
 }

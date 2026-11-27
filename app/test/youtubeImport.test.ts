@@ -126,3 +126,25 @@ it('persists video identity and meeting linkage before the first failing network
 it('prefers original source captions over an automatically translated Korean track',()=>{
  expect(chooseCaption({language:'en',automatic_captions:{ko:[{url:'https://example.org/captions?lang=en&tlang=ko'}],en:[{url:'https://example.org/captions?lang=en'}]}})).toEqual({language:'en',automatic:true})
 })
+
+it('dismisses only terminal history, persists across restart, and preserves records and retry', async()=>{
+ const root=temp(),store=new Store(join(root,'test.db'));stores.push(store)
+ const deps={root,store,window:()=>undefined,changed:vi.fn(),available:()=>false,recording:()=>true,transcribe:vi.fn()}
+ const manager=new ImportManager(deps), active=manager.add({url:'https://youtu.be/abcdefghijk'})
+ expect(()=>manager.dismiss(active.id)).toThrow('진행 중')
+ manager.dismissFinished()
+ expect(manager.list()[0].dismissedAt).toBeUndefined()
+ const meeting=store.createMeeting({title:'보존할 기록',titleSource:'user',startedAt:1,endedAt:2,state:'stopped',eventId:null,app:null,attendees:[],language:'korean'})
+ store.addSegments([{meetingId:meeting.id,track:'them',startMs:0,endMs:1000,text:'보존할 전사',speaker:null}])
+ const id='e39b3105-3c10-48cd-890a-f0f3920439d3'
+ writeFileSync(join(root,'imports',id+'.json'),JSON.stringify({...active,id,meetingId:meeting.id,stage:'failed',errorDetail:'429'}))
+ const restarted=new ImportManager(deps)
+ restarted.dismiss(id);restarted.dismissFinished()
+ const after=new ImportManager(deps)
+ expect(after.list().find(j=>j.id===id)?.dismissedAt).toBeGreaterThan(0)
+ expect(store.segments(meeting.id)[0].text).toBe('보존할 전사')
+ expect(store.meeting(meeting.id)?.title).toBe('보존할 기록')
+ after.retry(id)
+ expect(after.list().find(j=>j.id===id)?.dismissedAt).toBeUndefined()
+ expect(after.list().find(j=>j.id===id)?.stage).toBe('queued')
+})

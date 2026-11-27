@@ -17,7 +17,7 @@
 
 ## 설치
 
-[Releases](https://github.com/laguna821/achmage-yogurt/releases)에서 플랫폼에 맞는 파일을 받으세요. 공개 배포본은 로그인 없이 다운로드할 수 있습니다. 현재 버전은 **0.6.0-achmage.1**입니다.
+[Releases](https://github.com/laguna821/achmage-yogurt/releases)에서 플랫폼에 맞는 파일을 받으세요. 공개 배포본은 로그인 없이 다운로드할 수 있습니다. 현재 버전은 **0.6.0-achmage.2**입니다.
 
 | 플랫폼 | 파일 | 상태 |
 | --- | --- | --- |
