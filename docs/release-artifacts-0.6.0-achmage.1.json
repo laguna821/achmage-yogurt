@@ -1,0 +1,21 @@
+{
+  "version": "0.6.0-achmage.1",
+  "signed": false,
+  "assets": [
+    {
+      "name": "Achmage-Yogurt-linux-x86_64.AppImage",
+      "bytes": 459773903,
+      "sha256": "ca48c0a843c90d641f5cfe5cedb411a9d6fadbb5c01cdb7255af7c2a82fc18b1"
+    },
+    {
+      "name": "Achmage-Yogurt-mac-arm64.zip",
+      "bytes": 437674138,
+      "sha256": "6bea3b5af3c829ec6a7e2475bcbefa83163286cf3e397e0e6a6a63152f0dc9b0"
+    },
+    {
+      "name": "Achmage-Yogurt-windows-x64.exe",
+      "bytes": 390321071,
+      "sha256": "6b210e3a849509abc9291167a816337aa6543414435f4c24eb9997804d4656b8"
+    }
+  ]
+}

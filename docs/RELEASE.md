@@ -1,6 +1,6 @@
 # 개발·서명 없는 배포
 
-Node 24와 pnpm 10.7.0을 사용합니다. 원래 MIT 저작권 고지를 유지합니다. 현재 소스와 이 컴퓨터의 Linux 설치 버전은 `0.5.0-achmage.1`입니다. GitHub의 기존 Windows/macOS/Linux 사전 릴리스는 `0.4.0-achmage.1`이며, 이번 YouTube 영상 정리 기능은 이 컴퓨터에 적용하며 원격 설치본은 다시 배포하지 않았습니다. 사용법은 [YouTube 영상 정리](YOUTUBE-WORKSPACE.md)를 확인하세요.
+Node 24와 pnpm 10.7.0을 사용합니다. 원래 MIT 저작권 고지를 유지합니다. 현재 공개 배포 버전은 `0.6.0-achmage.1`입니다. Linux AppImage, Windows x64 EXE, macOS arm64 ZIP을 로컬에서 빌드합니다. 이번 버전의 범위와 검증은 [최종 문서 편집](FINAL-EDIT.md)을 참고하세요.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -49,6 +49,6 @@ node app/scripts/cross-desktop.mjs darwin /absolute/temp/cross-mac
 
 두 활성 워크플로는 모두 `workflow_dispatch` 전용입니다. push/PR/schedule로 자동 실행하지 않습니다. 업로드 아티팩트 보관은 3일, 작업 타임아웃은 55분입니다. 기존 upstream 워크플로는 `.github/upstream-workflows/`에 자료로만 보관했습니다.
 
-현재 연결 범위로는 계정의 Actions 잔여량을 조회하지 못했습니다. 저장소는 비공개이며 이번 빌드에서 Actions를 실행하지 않았습니다. 수동 실행 전 계정 Billing에서 포함량·사용량·예산을 확인해야 합니다. 저장소 commit/push와 Actions runner 사용량은 서로 다릅니다.
+현재 연결 범위로는 계정의 Actions 잔여량을 조회하지 못했습니다. 저장소는 공개이며 이번 빌드에서 Actions를 실행하지 않았습니다. 수동 실행 전 계정 Billing에서 포함량·사용량·예산을 확인해야 합니다. 저장소 commit/push와 Actions runner 사용량은 서로 다릅니다.
 
 초기 배포는 자동 업데이트를 사용하지 않습니다. 공개 배포나 자동 업데이트를 켜기 전 플랫폼 실기기 시험과 각 런타임의 배포 라이선스/소스 제공 의무를 검토하세요. GPL FFmpeg는 제공한 버전·빌드 출처와 라이선스를 계속 동봉해야 합니다.

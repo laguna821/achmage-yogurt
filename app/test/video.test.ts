@@ -18,11 +18,12 @@ const temp = () => { const d = mkdtempSync(join(tmpdir(), 'video-test-')); dirs.
 const meta: VideoMetadata = { url: 'https://www.youtube.com/watch?v=abcdefghijk', videoId: 'abcdefghijk', title: '한국어 English 강의', channel: '채널', durationMs: 600000, startMs: 90000, endMs: 120000, transcriptSource: '로컬 Whisper' }
 const turns: VideoTurn[] = [{ id: 'T1', startMs: 90000, endMs: 100000, text: '상관관계를 인과관계로 해석하지 않습니다.' }]
 const frames: VideoFrame[] = [{ id: 'V91000', atMs: 91000, file: 'frame-1234567890abcdef.jpg', sha256: '', kind: 'question', text: 'Q. 인과관계인가요?', description: '화면 질문', score: 10 }]
-const raw = () => ({ keyPoints: [{ text: '상관과 인과를 구별합니다.', refs: ['T1'] }], topics: [{ title: '상관과 인과', paragraphs: [{ text: '인과로 단정하지 않는다는 조건을 강조합니다.', refs: ['T1', 'V91000'] }], frameIds: ['V91000'] }], questions: [] })
+const raw = () => ({ coverage:[{sourceTopicId:'topic-0-1',finalTopicIndex:0}], keyPoints: [{ text: '상관과 인과를 구별합니다.', refs: ['T1'] }], topics: [{ title: '상관과 인과', paragraphs: [{ text: '인과로 단정하지 않는다는 조건을 강조합니다.', refs: ['T1', 'V91000'] }], frameIds: ['V91000'] }], questions: [] })
 describe('evidence and export document contracts', () => {
   it('owns original timeline links and real asset paths, never invented images', () => {
     const doc = validateDocument(raw(), turns, frames), md = renderVideoDocument(doc, meta, turns, frames, defaultVideoOptions, [])
-    expect(md).toContain('t=90s'); expect(md).toContain('assets/frame-1234567890abcdef.jpg'); expect(md).toContain('화면에 표시된 글'); expect(md).toContain('인과로 단정하지 않는다는 조건')
+    expect(md).not.toContain('t=90s'); expect(md).toContain('assets/frame-1234567890abcdef.jpg'); expect(md).toContain('화면에 표시된 글'); expect(md).toContain('인과로 단정하지 않는다는 조건')
+    expect(renderVideoDocument(doc, meta, turns, frames, defaultVideoOptions, [], true)).toContain('t=90s')
     expect(videoTimeUrl(meta.url, 90600)).toContain('t=90s')
     expect(renderVideoDocument(doc, meta, turns, [{ ...frames[0], hidden: true }], defaultVideoOptions, [])).not.toContain('![')
   })
@@ -59,8 +60,8 @@ describe('persisted video pipeline', () => {
   it('persists source metadata, uses original offset, caches checked drafts and keeps previous editor text', async () => {
     const f = fixture(); f.workspace.configure(f.m.id, { visuals: false }); f.store.setNotes(f.m.id, { enhanced: '사용자가 편집한 원문', edited: true })
     const md = await f.workspace.run(f.m.id, f.llm, new AbortController().signal)
-    expect(md).toContain('t=90s'); expect(f.llm.chat).toHaveBeenCalledTimes(2); expect(f.store.notes(f.m.id).enhanced).toBe('사용자가 편집한 원문')
-    await f.workspace.run(f.m.id, f.llm, new AbortController().signal); expect(f.llm.chat).toHaveBeenCalledTimes(2)
+    expect(md).not.toContain('t=90s'); expect(f.llm.chat).toHaveBeenCalledTimes(3); expect(f.store.notes(f.m.id).enhanced).toBe('사용자가 편집한 원문')
+    await f.workspace.run(f.m.id, f.llm, new AbortController().signal); expect(f.llm.chat).toHaveBeenCalledTimes(3)
     const reopened = new VideoWorkspace({ root: f.root, store: f.store, changed: () => {}, modelKey: () => 'configured-model-xhigh' })
     expect(reopened.get(f.m.id)?.metadata.uploadDate).toBe('2026-11-24'); expect(reopened.get(f.m.id)?.phase).toBe('ready')
   })
@@ -77,6 +78,24 @@ describe('persisted video pipeline', () => {
     const md = await f.workspace.run(f.m.id, f.llm, new AbortController().signal)
     expect(md).toContain('화면만의 질문'); expect(f.workspace.asset(f.m.id, frames[0].file)).toBeTruthy(); expect(f.workspace.asset(f.m.id, '../input.jpg')).toBeUndefined()
     writeFileSync(f.workspace.asset(f.m.id, frames[0].file)!, 'tampered'); expect(f.workspace.asset(f.m.id, frames[0].file)).toBeUndefined()
+  })
+  it('refuses incomplete final topic coverage and preserves the prior document',async()=>{
+    const f=fixture();f.workspace.configure(f.m.id,{visuals:false});f.store.setNotes(f.m.id,{enhanced:'기존 편집',edited:true})
+    vi.mocked(f.llm.chat).mockImplementation(async prompt=>JSON.stringify({...raw(),coverage:prompt.includes('ONE coherent')?[]:raw().coverage,topics:[{...raw().topics[0],paragraphs:[{text:'근거 문장',refs:['T1']}],frameIds:[]}]}))
+    await expect(f.workspace.run(f.m.id,f.llm,new AbortController().signal)).rejects.toThrow('일부 주제')
+    expect(f.store.notes(f.m.id).enhanced).toBe('기존 편집')
+  })
+  it('normalizes untouched cached rolling captions but preserves edited transcripts and evidence snapshots',async()=>{
+    const f=fixture(),segments=f.store.segments(f.m.id)
+    writeFileSync(join(f.dir,'import-transcript.json'),JSON.stringify({kind:'youtube-captions',source:'youtube.ko.vtt',turns:segments}))
+    writeFileSync(join(f.dir,'original/youtube.ko.vtt'),'WEBVTT\n\n00:01:30.000 --> 00:01:32.000\n \n복구된<00:01:31.000><c> 설명</c>\n\n00:01:32.000 --> 00:01:32.010\n복구된 설명\n')
+    f.workspace.configure(f.m.id,{visuals:false})
+    await f.workspace.run(f.m.id,f.llm,new AbortController().signal)
+    expect(f.workspace.get(f.m.id)?.evidenceTurns).toEqual([{id:'T1',text:'복구된 설명',startMs:90000,endMs:92000}])
+    expect(f.store.segments(f.m.id)[0].text).toBe(turns[0].text)
+    writeFileSync(join(f.dir,'import-transcript.json'),JSON.stringify({kind:'youtube-captions',source:'youtube.ko.vtt',turns:[{...segments[0],text:'수정 전 내용'}]}))
+    await f.workspace.run(f.m.id,f.llm,new AbortController().signal)
+    expect(f.workspace.get(f.m.id)?.evidenceTurns?.[0].text).toBe(turns[0].text)
   })
   it('cancellation starts no new calls and records an interrupted run', async () => {
     const f = fixture(), controller = new AbortController(); controller.abort()

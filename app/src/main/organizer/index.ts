@@ -163,7 +163,7 @@ export class Organizer {
       const packet = JSON.stringify({ sessionKind: s.kind, outputProfile: s.options.profile, findings: s.findings, speakers: s.speakers, questions: s.questions, userAnswers: answers, sources: s.evidence.map(e => ({ id: e.id, title: e.title, locator: e.locator, revision: e.revision })), sourceReceipts: JSON.parse(receipts(s.evidence)), checkedConnections: s.connectors, preparedOriginalPreserved: true })
       const enriched: PromptInput = { ...input, transcript: named, recordEvidence: packet, sessionKind: s.kind, outputProfile: s.options.profile }
       stage('drafting', '확인한 근거를 반영해 논의와 설명을 빠짐없이 정리하고 있습니다.')
-      let md = await writeTranscriptRecord(enriched, llm, () => {}, step => { if (step === 'checking') stage('checking', '원문·근거와 대조하고 문서 형식과 숫자를 검수하고 있습니다.') })
+      let md = await writeTranscriptRecord(enriched, llm, () => {}, step => { if (step === 'checking') stage('checking', '문서 전체를 최종 편집하며 원문·근거와 숫자를 함께 검수하고 있습니다.') })
       let checked = await this.runtime.check(work, md, s.options.profile, s.evidence, signal)
       if (!checked.ok || /한 줄 사슬 도식|도식의 대부분이 한 유형/.test(checked.lint)) {
         stage('checking', '검사에서 지적한 문서·도식 문제를 고치고 있습니다.')

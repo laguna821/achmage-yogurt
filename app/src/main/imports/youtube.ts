@@ -10,13 +10,14 @@ export type CaptionTrack = { language: string; automatic: boolean }
 export function chooseCaption(info: YouTubeInfo): CaptionTrack | undefined {
   const tracks = [false, true].flatMap(automatic => Object.entries(automatic ? info.automatic_captions || {} : info.subtitles || {})
     .filter(([language, formats]) => language !== 'live_chat' && /^[A-Za-z0-9_-]{1,60}$/.test(language) && Array.isArray(formats) && formats.length > 0)
-    .map(([language]) => ({ language, automatic })))
+    .map(([language, formats]) => ({ language, automatic, translated: (formats as {url?:string}[]).some(f => { try { return !!f.url && new URL(f.url).searchParams.has('tlang') } catch { return false } }) })))
   const rank = (t: CaptionTrack) => {
     const language = t.language.toLowerCase()
     const group = language === 'ko' || language.startsWith('ko-') ? 0 : language === 'en' || language.startsWith('en-') ? 1 : language === info.language ? 2 : 3
-    return group * 10 + Number(t.automatic)
+    return Number((t as CaptionTrack & {translated:boolean}).translated) * 1000 + (info.language && language.replace(/-orig$/, '') === info.language.toLowerCase() ? 0 : 100) + group * 10 + Number(t.automatic)
   }
-  return tracks.sort((a, b) => rank(a) - rank(b) || a.language.localeCompare(b.language))[0]
+  const chosen = tracks.sort((a, b) => rank(a) - rank(b) || a.language.localeCompare(b.language))[0]
+  return chosen && {language:chosen.language,automatic:chosen.automatic}
 }
 
 export function captionProblem(error: unknown): string {

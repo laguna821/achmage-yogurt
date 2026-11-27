@@ -14,6 +14,7 @@ export function validateDocument(raw: any, turns: VideoTurn[], frames: VideoFram
     if (refs.some(r => !ids.has(r))) throw new Error('정리본이 존재하지 않는 근거를 인용했습니다. 이전 문서는 보존했습니다.')
     const text = string(p.text)
     if (text && !refs.length) throw new Error('정리 문단의 원본 근거가 누락됐습니다.')
+    if ((text.match(/^```/gm) || []).length % 2) throw new Error('정리 문단의 도식이 끝나지 않았습니다. 이전 문서는 보존했습니다.')
     // Prose may use Markdown emphasis, lists and tables, but source/image URLs come from the registry.
     if (/!\[|\]\(|<\/?(?:img|iframe|script)|https?:\/\//i.test(text)) throw new Error('정리 문단에 검증되지 않은 링크가 포함됐습니다.')
     return { text, refs: [...new Set(refs)] }
@@ -25,21 +26,21 @@ export function validateDocument(raw: any, turns: VideoTurn[], frames: VideoFram
   return { keyPoints: paras(raw.keyPoints).slice(0, 5), topics, questions }
 }
 const esc = (s: string) => s.replace(/[\\`*{}\[\]<>#|]/g, '\\$&').replace(/[\r\n]+/g, ' ')
-export function renderVideoDocument(doc: VideoDocument, meta: VideoMetadata, turns: VideoTurn[], frames: VideoFrame[], options: VideoOptions, warnings: string[]): string {
+export function renderVideoDocument(doc: VideoDocument, meta: VideoMetadata, turns: VideoTurn[], frames: VideoFrame[], options: VideoOptions, warnings: string[], evidence = false): string {
   const refs = new Map([...turns.map(t => [t.id, t.startMs] as const), ...frames.map(f => [f.id, f.atMs] as const)])
-  const paragraph = (p: VideoParagraph) => `${p.text}\n\n${p.refs.map(id => `[${id} · ${videoTime(refs.get(id)!)}](${videoTimeUrl(meta.url, refs.get(id)!)})`).join(' · ')}`
-  const lines = [`# ${esc(meta.title)}`, '', [meta.channel && esc(meta.channel), meta.uploadDate && esc(meta.uploadDate), `[원본 영상](${meta.url})`].filter(Boolean).join(' · '), '', `분석 범위 ${videoTime(meta.startMs)}–${videoTime(meta.endMs)} · 전사: ${esc(meta.transcriptSource)}${meta.captionLanguage ? ` (${esc(meta.captionLanguage)}${meta.captionAutomatic ? ', 자동' : ''})` : ''}`, '', '## 한눈에 보기', '', ...doc.keyPoints.map((p, n) => `${n + 1}. ${paragraph(p)}`)]
+  const paragraph = (p: VideoParagraph) => !evidence ? p.text : `${p.text}\n\n${p.refs.map(id => `[${id} · ${videoTime(refs.get(id)!)}](${videoTimeUrl(meta.url, refs.get(id)!)})`).join(' · ')}`
+  const lines = [`# ${esc(meta.title)}`, '', [meta.channel && esc(meta.channel), meta.uploadDate && esc(meta.uploadDate), `[원본 영상](${meta.url})`].filter(Boolean).join(' · '), ...(evidence ? ['', `분석 범위 ${videoTime(meta.startMs)}–${videoTime(meta.endMs)} · 전사: ${esc(meta.transcriptSource)}`] : []), '', '## 한눈에 보기', '', ...doc.keyPoints.map((p, n) => `${n + 1}. ${paragraph(p)}`)]
   for (const [n, topic] of doc.topics.entries()) {
     lines.push('', `## ${String(n + 1).padStart(2, '0')}. ${esc(topic.title)}`, '', ...topic.paragraphs.map(paragraph))
     for (const id of topic.frameIds) {
       const f = frames.find(f => f.id === id && !f.hidden)
       if (!f) continue
-      lines.push('', `![${esc(f.kind === 'question' ? '화면 질문' : f.kind === 'chart' ? '화면 도표' : '영상 화면')} — ${videoTime(f.atMs)}](assets/${f.file})`, '', `*${esc(f.description || f.text || '영상의 실제 화면')} · [${id} · ${videoTime(f.atMs)}](${videoTimeUrl(meta.url, f.atMs)})*`)
+      lines.push('', `![${esc(f.kind === 'question' ? '화면 질문' : f.kind === 'chart' ? '화면 도표' : '영상 화면')}${evidence ? ' — '+videoTime(f.atMs) : ''}](assets/${f.file})`, '', `*${esc(f.description || f.text || '영상의 실제 화면')}${evidence ? ` · [${id} · ${videoTime(f.atMs)}](${videoTimeUrl(meta.url, f.atMs)})` : ''}*`)
       if (f.text) lines.push('', `> 화면에 표시된 글: ${f.text.split('\n').map(esc).join('\n> ')}`)
     }
   }
   if (doc.questions.length) lines.push('', '## 확인이 필요한 내용', '', ...doc.questions.map(q => `- ${esc(q.question)}${q.answer ? ` — 사용자 확인: ${esc(q.answer)}` : ' (미확인)'}`))
-  lines.push('', '## 처리 범위', '', `- 전사와 화면은 원본 영상 시간 기준입니다. 출력 언어: ${esc(options.language)}.`, `- 화면: ${options.visuals ? `대표 프레임 ${frames.filter(f => !f.hidden).length}개 판독. 표본 사이의 모든 장면을 확인한 것은 아닙니다.` : '분석하지 않음.'}`, '- 외부 심층 조사: 별도 버튼으로 실행하며 원래 발언과 구분해 저장합니다.', ...warnings.map(w => `- ${esc(w)}`))
+  if(evidence) lines.push('', '## 처리 범위', '', `- 전사와 화면은 원본 영상 시간 기준입니다. 출력 언어: ${esc(options.language)}.`, `- 화면: ${options.visuals ? `대표 프레임 ${frames.filter(f => !f.hidden).length}개 판독. 표본 사이의 모든 장면을 확인한 것은 아닙니다.` : '분석하지 않음.'}`, '- 외부 심층 조사: 별도 버튼으로 실행하며 원래 발언과 구분해 저장합니다.', ...warnings.map(w => `- ${esc(w)}`))
   return lines.join('\n\n').replace(/\n{3,}/g, '\n\n') + '\n'
 }
 /** Split by complete timed turns, with a hard size ceiling; never silently discard the tail. */

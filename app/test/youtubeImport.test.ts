@@ -122,3 +122,7 @@ it('persists video identity and meeting linkage before the first failing network
  await vi.waitFor(()=>expect(manager.list()[0].stage).toBe('failed'))
  expect(command).toHaveBeenCalledOnce()
 })
+
+it('prefers original source captions over an automatically translated Korean track',()=>{
+ expect(chooseCaption({language:'en',automatic_captions:{ko:[{url:'https://example.org/captions?lang=en&tlang=ko'}],en:[{url:'https://example.org/captions?lang=en'}]}})).toEqual({language:'en',automatic:true})
+})

@@ -64,7 +64,7 @@ export class TranscriptRuntime {
     const file = join(work, 'record.md'); writeFileSync(file, md)
     const paths = [join(work, 'turns.txt')]
     for (const e of sources) { const p = join(work, `source-${e.id.replace(/[^A-Za-z0-9_-]/g, '')}.txt`); writeFileSync(p, e.text); paths.push(p) }
-    const lint = await this.run(['lint', file, '--profile', profile], signal)
+    const lint = await this.run(['lint', file, '--profile', profile, ...(profile === 'record' ? ['--reader-format'] : [])], signal)
     const facts = await this.run(['facts', file, '--sources', ...paths], signal)
     writeFileSync(join(work, 'lint.log'), lint.text); writeFileSync(join(work, 'facts.log'), facts.text)
     return { ok: lint.code === 0, lint: lint.text, facts: facts.text }

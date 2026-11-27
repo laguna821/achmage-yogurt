@@ -32,14 +32,29 @@ export function parseTranscript(raw:string,extension:string):{turns:ImportedTurn
     return {turns,timed:true}
   }
   const lines=text.split('\n'),turns:ImportedTurn[]=[]
+  // A space-only payload line is valid WebVTT, not a cue separator.
+  const timing=/^\s*((?:\d+:)?\d{1,2}:\d{2}[.,]\d+)\s*-->\s*((?:\d+:)?\d{1,2}:\d{2}[.,]\d+)/
+  const wordTime=/<(?:\d+:)?\d{2}:\d{2}\.\d+>/
+  const clean=(s:string)=>s.replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ').trim()
+  let previous=new Map<string,boolean>(),previousEnd=-Infinity
   for(let i=0;i<lines.length;i++){
-    const time=lines[i].match(/^\s*((?:\d+:)?\d{1,2}:\d{2}[.,]\d+)\s*-->\s*((?:\d+:)?\d{1,2}:\d{2}[.,]\d+)/)
+    const time=lines[i].match(timing)
     if(!time)continue
-    const body:string[]=[];while(++i<lines.length&&lines[i].trim())body.push(lines[i])
+    const body:string[]=[]
+    while(i+1<lines.length&&lines[i+1]!==''&&!timing.test(lines[i+1]))body.push(lines[++i])
     const source=body.join('\n'),speaker=source.match(/<v(?:\.[^ >]+)?\s+([^>]+)>/)?.[1]||null
-    const clean=source.replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
     const startMs=ms(time[1]),endMs=ms(time[2]);if(endMs<startMs)throw new Error('종료 시각이 시작보다 빠른 구간이 있습니다.')
-    if(clean.trim())turns.push({text:clean.trim(),startMs,endMs,speaker})
+    const current=new Map<string,boolean>(),fresh:string[]=[]
+    for(const line of body){
+      const value=clean(line);if(!value)continue
+      const timed=wordTime.test(line),prior=previous.get((speaker||'')+'\0'+value),adjacent=startMs<=previousEnd+250&&startMs>=previousEnd-1000
+      // Only proven rolling display copies are removed. A re-timed repetition is new speech.
+      const copy=ext==='vtt'&&!timed&&prior===true&&adjacent
+      current.set((speaker||'')+'\0'+value,timed||copy)
+      if(!copy)fresh.push(value)
+    }
+    if(fresh.length)turns.push({text:fresh.join('\n'),startMs,endMs,speaker})
+    previous=current;previousEnd=endMs
   }
   if(turns.length)return {turns,timed:true}
   if(ext==='srt'||ext==='vtt')throw new Error('자막에서 유효한 시간 구간을 찾지 못했습니다.')

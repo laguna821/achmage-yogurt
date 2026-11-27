@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import type { Store } from '../store'
 import type { Llm } from '../notes/enhance'
 import { videoOptions, VIDEO_ASSET, type VideoState, type VideoOptions, type VideoTurn, type VideoFrame, type VideoDocument, type VideoResearch } from '../../shared/video'
+import { parseTranscript } from '../../shared/imports'
+import { FINAL_STYLE } from '../notes/finalStyle'
 import { VideoSources } from '../imports/sources'
 import { DATA, representativeFrames, hash, json, renderVideoDocument, turnBatches, validateDocument } from './document'
 import { candidates, contactSheet, ensureVideo, extractFrame } from './media'
@@ -44,13 +46,29 @@ export class VideoWorkspace {
         transcriptSource: source.transcriptSource === 'youtube-captions' ? 'YouTube 자막' : source.transcriptSource === 'local-asr' ? '로컬 Whisper' : job?.stage === 'done' && segments.length ? '가져온 전사' : '전사 준비 중', captionLanguage: source.captionLanguage, captionAutomatic: source.captionAutomatic }
       state.import = job ? { jobId: job.id, stage: job.stage, message: job.message } : undefined
     }
+    // Legacy document T IDs refer to the original DB order, never the new normalized order.
+    if(state.document && !state.evidenceTurns) state.evidenceTurns = segments.filter(t=>t.text.trim()).map((t,i)=>({id:`T${i+1}`,text:t.text,startMs:t.startMs+state!.metadata.startMs,endMs:t.endMs+state!.metadata.startMs}))
     state.transcriptReady = segments.some(t => t.text.trim()) && !meeting.transcriptionPending && (!state.import || state.import.stage === 'done')
     this.states.set(id, state); return structuredClone(state)
   }
   save(state: VideoState) { const dir = this.dir(state.meetingId); mkdirSync(dir, { recursive: true, mode: 0o700 }); state.updatedAt = Date.now(); this.states.set(state.meetingId, structuredClone(state)); writeFileSync(join(dir, 'state.json.tmp'), JSON.stringify(state, null, 2), { mode: 0o600 }); renameSync(join(dir, 'state.json.tmp'), join(dir, 'state.json')); this.p.changed(structuredClone(state)) }
   configure(id: string, options: Partial<VideoOptions>) { const s = this.get(id); if (!s) throw new Error('YouTube 원본을 찾지 못했습니다.'); s.options = videoOptions(options); this.save(s); return s }
   stage(id: string, phase: VideoState['phase'], message: string) { const s = this.get(id); if (!s) throw new Error('YouTube 원본을 찾지 못했습니다.'); s.phase = phase; s.message = message; this.save(s); return s }
-  private turns(s: VideoState): VideoTurn[] { return this.p.store.segments(s.meetingId).filter(t => t.text.trim()).map((t, i) => ({ id: `T${i + 1}`, text: t.text, startMs: t.startMs + s.metadata.startMs, endMs: t.endMs + s.metadata.startMs })) }
+  private turns(s: VideoState, fresh = false): VideoTurn[] {
+    if(!fresh && s.evidenceTurns) return s.evidenceTurns
+    const stored=this.p.store.segments(s.meetingId).filter(t=>t.text.trim())
+    let source=stored.map(t=>({text:t.text,startMs:t.startMs+s.metadata.startMs,endMs:t.endMs+s.metadata.startMs}))
+    // Upgrade old rolling captions only when the imported transcript is still untouched.
+    // User edits and original DB segments are never replaced as a side effect of organizing.
+    try {
+      const dir=join(this.p.root,'meetings',s.meetingId), receipt=JSON.parse(readFileSync(join(dir,'import-transcript.json'),'utf8'))
+      if(receipt.kind==='youtube-captions' && /^youtube\.[A-Za-z0-9_-]+\.vtt$/.test(receipt.source) && Array.isArray(receipt.turns) && receipt.turns.length===stored.length && receipt.turns.every((t:any,n:number)=>t.text===stored[n].text&&t.startMs===stored[n].startMs&&t.endMs===stored[n].endMs)) {
+        const parsed=parseTranscript(readFileSync(join(dir,'original',receipt.source),'utf8'),'vtt').turns
+        source=parsed.filter(t=>t.endMs>s.metadata.startMs && t.startMs<s.metadata.endMs).map(t=>({text:t.text,startMs:Math.max(t.startMs,s.metadata.startMs),endMs:Math.min(t.endMs,s.metadata.endMs)}))
+      }
+    } catch { /* Missing originals use the preserved editable transcript. */ }
+    return source.map((t,i)=>({...t,id:`T${i+1}`}))
+  }
   private async cached<T>(s: VideoState, key: unknown, signal: AbortSignal, run: () => Promise<T>): Promise<T> {
     const dir = join(this.dir(s.meetingId), 'cache'); mkdirSync(dir, { recursive: true }); const path = join(dir, hash(JSON.stringify([key, s.model, 'video-prompt-v1'])) + '.json')
     if (signal.aborted) throw new Error('작업을 중단했습니다.')
@@ -66,7 +84,7 @@ export class VideoWorkspace {
   async run(id: string, llm: Llm, signal: AbortSignal): Promise<string> {
     const s = this.get(id); if (!s) throw new Error('YouTube 원본을 찾지 못했습니다.')
     if (!s.transcriptReady) throw new Error('전사 가져오기가 아직 완료되지 않았습니다. 가져오기 상태를 확인하세요.')
-    const turns = this.turns(s); if (!turns.length) throw new Error('전사 원문이 없습니다. 먼저 가져오기를 완료하세요.')
+    const turns = this.turns(s, true); if (!turns.length) throw new Error('전사 원문이 없습니다. 먼저 가져오기를 완료하세요.')
     s.model = this.p.modelKey(); s.warnings = []; s.checks = []; s.aiCalls = 0
     const stage = (phase: VideoState['phase'], message: string) => { if (signal.aborted) throw new Error('작업을 중단했습니다.'); s.phase = phase; s.message = message; this.save(s) }
     const ask = async (prompt: string, images?: string[], maxTokens = 10000) => {
@@ -110,7 +128,7 @@ export class VideoWorkspace {
       for(const e of context.filter(e=>e.imagePath)) {const read=await this.cached<any>(s,['context-image',hash(readFileSync(e.imagePath!))],signal,()=>ask(`${DATA}\nRead this user-supplied context image faithfully. Return JSON {text:string}. Mark illegible text; preserve labels and diagram meaning.`,[e.imagePath!],8000));e.text=typeof read.text==='string'?read.text:''}
       const contextText = JSON.stringify(context.map(e => ({ id: `C-${e.id}`, title: e.title, text: e.text.slice(0, 12000) }))).slice(0, 50000)
       const batches = turnBatches(turns, Math.min(24000, Math.max(3000, Math.floor(llm.contextSize * 0.25))))
-      const doc: VideoDocument = { keyPoints: [], topics: [], questions: [] }
+      let doc: VideoDocument = { keyPoints: [], topics: [], questions: [] }
       for (const [n, batch] of batches.entries()) {
         stage('organizing', `원문 ${n + 1}/${batches.length} 구간을 빠짐없이 정리하고 있습니다.`)
         const nearby = s.frames.filter(f => f.atMs >= batch[0].startMs - 20000 && f.atMs <= batch.at(-1)!.endMs + 10000)
@@ -120,12 +138,17 @@ export class VideoWorkspace {
         const checked = await this.cached<VideoDocument>(s, ['check', input, draft], signal, async () => validateDocument(await ask(`${DATA}\nIndependently audit and revise this WHOLE proposed video note against original turns/screens. Preserve substantial detail, ensure the final topics are covered, correct unsupported numbers/negation/conditions, remove unsupported attributions. Screen text must not be presented as a spoken quote. Do not invent extra context. Return the SAME JSON document schema {keyPoints:[{text,refs}],topics:[{title,paragraphs:[{text,refs}],frameIds}],questions:[{question,category:identity|meaning|value,refs:string[]}]}. Keep only supplied T/V refs. Questions default to []; retain only concrete user-answerable identity/transcription-meaning/conflicting-value clarifications with category identity|meaning|value and refs. Never ask the user to supply broad scientific explanations or future research. Output in ${s.options.language}.\nSOURCE:${JSON.stringify(input)}\nDRAFT:${JSON.stringify(draft)}`, undefined, 14000), batch, nearby, n))
         doc.keyPoints.push(...checked.keyPoints); doc.topics.push(...checked.topics); doc.questions.push(...checked.questions)
       }
-      if (doc.keyPoints.length > 5) {
-        const summary = await this.cached<any>(s, ['keypoints', doc.keyPoints], signal, () => ask(`${DATA}\nChoose/combine 3-5 central claims covering the whole video, retaining exact valid refs. Return JSON {keyPoints:[{text,refs}]} in ${s.options.language}. No links.\nCANDIDATES:${JSON.stringify(doc.keyPoints)}`, undefined, 3000))
-        doc.keyPoints = validateDocument({ ...summary, topics: [doc.topics[0]], questions: [] }, turns, s.frames).keyPoints
-      }
+      stage('finalizing', '문서 전체의 중복과 흐름을 다듬어 읽기 좋은 최종 정리본을 만들고 있습니다.')
+      const reviewed=doc
+      doc=await this.cached<VideoDocument>(s,['final-edit-v1',FINAL_STYLE,reviewed,turns,s.frames,contextText,s.options],signal,async()=>{
+        const edited=await ask(`${DATA}\n${FINAL_STYLE}\nEdit the complete independently checked document as ONE coherent reader-ready document in ${s.options.language}. Source turns are supplied to check details. Preserve all substantive topics and their supporting examples. Combine overlapping sections and provide a useful overview. Return JSON {keyPoints:[{text,refs}],topics:[{title,paragraphs:[{text,refs}],frameIds}],questions:[],coverage:[{sourceTopicId,finalTopicIndex}]}. Every original topic ID must appear in coverage, pointing to its zero-based final topic index; this is a completeness map, not reader-facing text. Keep valid supplied T/V IDs in refs and real frameIds. No URLs or playback timestamps in prose. Tables, prose and meaningful source-supported Mermaid are allowed. Do not truncate the ending.\nSOURCE:${JSON.stringify(turns)}\nSCREENS:${JSON.stringify(s.frames)}\nCONTEXT:${contextText}\nUSER OPTIONS:${JSON.stringify(s.options)}\nCHECKED DOCUMENT:${JSON.stringify(reviewed)}`,undefined,24000)
+        const result=validateDocument(edited,turns,s.frames)
+        if(!Array.isArray(edited.coverage)||reviewed.topics.some(t=>!edited.coverage.some((c:any)=>c.sourceTopicId===t.id&&Number.isInteger(c.finalTopicIndex)&&result.topics[c.finalTopicIndex])))throw new Error('최종 편집에서 일부 주제의 대응을 확인하지 못했습니다. 이전 문서와 검수 캐시를 보존했습니다.')
+        result.questions=reviewed.questions
+        return result
+      })
       doc.questions = doc.questions.filter(q=>q.category&&q.refs?.length).slice(0, 8).map((q, n) => ({ ...q, id: `Q${n + 1}`, answer: s.document?.questions.find(old => old.question === q.question)?.answer }))
-      s.document = doc; s.checks = ['문단의 T/V 근거 ID와 이미지 등록 여부 검사', `원문 ${batches.length}구간별 별도 AI 검수 완료 · 사실 정확도의 자동 보장은 아님`]
+      s.document = doc; s.evidenceTurns = turns; s.checks = ['전체 문서 최종 편집 및 원래 주제 대응 검사', '문단의 T/V 근거 ID와 이미지 등록 여부 검사', `원문 ${batches.length}구간별 별도 AI 검수 완료 · 사실 정확도의 자동 보장은 아님`]
       s.phase = doc.questions.some(q => !q.answer) ? 'questions' : s.warnings.length ? 'partial' : 'ready'; s.message = s.phase === 'questions' ? '정리본이 준비됐습니다. 남은 중요한 확인 사항만 답해 주세요.' : s.warnings.length ? '전사 정리는 완료했습니다. 화면 처리 범위와 알림을 확인하세요.' : '전사·화면 근거를 연결한 영상 정리본이 준비됐습니다.'
       this.save(s); return renderVideoDocument(doc, s.metadata, turns, s.frames, s.options, s.warnings)
     } catch (error) { s.phase = signal.aborted ? 'cancelled' : 'failed'; s.message = error instanceof Error ? error.message : String(error); this.save(s); throw error }

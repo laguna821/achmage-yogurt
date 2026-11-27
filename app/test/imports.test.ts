@@ -65,3 +65,32 @@ describe('document import and version fidelity',()=>{
     expect(()=>handler('versions:restore')(null,m.id,previous.id,'다른 현재문서')).toThrow();expect(handler('versions:restore')(null,m.id,previous.id,'# 새 후보')).toBe(true);expect(store.notes(m.id).enhanced).toBe('# 기존 정리본');store.close()
   })
 })
+
+it('keeps whitespace payloads and new repeated speech while removing proven rolling display copies',()=>{
+ const vtt=`WEBVTT
+
+00:00:01.000 --> 00:00:03.000
+${' '}
+첫<00:00:02.000><c> 문장</c>
+
+00:00:03.000 --> 00:00:03.010
+첫 문장
+${' '}
+
+00:00:03.010 --> 00:00:05.000
+첫 문장
+다음<00:00:04.000><c> 문장</c>
+
+00:00:05.000 --> 00:00:07.000
+다음 문장
+첫<00:00:06.000><c> 문장</c>
+`
+ const r=parseTranscript(vtt,'vtt')
+ expect(r.turns.map(t=>t.text)).toEqual(['첫 문장','다음 문장','첫 문장'])
+ expect(r.turns.map(t=>t.startMs)).toEqual([1000,3010,5000])
+})
+it('does not deduplicate repeated plain subtitles',()=>{
+ const raw='00:00:01.000 --> 00:00:02.000\n네\n\n00:00:02.000 --> 00:00:03.000\n네\n'
+ expect(parseTranscript(raw,'vtt').turns.map(t=>t.text)).toEqual(['네','네'])
+ expect(parseTranscript(raw,'srt').turns).toHaveLength(2)
+})

@@ -30,3 +30,7 @@ The editor preserves complete prose, editable GFM tables, headings and Mermaid s
 ## Validation
 
 Run scoped organizer, Gmail, subscription, notes, transcript-record, markdown, setup and localization tests, TypeScript and electron-vite build. Mocked tests exercise PKCE/state/read-only mail calls, full pinned Python execution, no automatic model call after recording, durable answers, invalid citations and output cutoffs. A separate opt-in test reads real vault evidence without an LLM. Use an isolated native profile for settings/preparation QA, then test a real saved meeting through the actual organizing button with the selected model. Compare original transcript/audio hashes and typed notes, reload the record and restart the normal app. Private QA data and live SQLite backups stay outside Git.
+
+## 0.6.0 app format adaptation
+
+The vendored validator adds opt-in `lint --reader-format` for personal `record` output, allowing ordered procedures and checklists. Defaults and `minutes` remain unchanged. The manifest pins the adapted script hash and retains the source skill hash. The external installed skill is untouched. Final editorial rules are shared with video documents.

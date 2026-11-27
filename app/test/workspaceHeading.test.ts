@@ -13,7 +13,7 @@ function heading(route: string, meeting?: { id: string; title: string }) {
 }
 
 it('uses plain page titles and always reserves both history controls', () => {
-  for (const route of ['', '/meetings']) expect(heading(route)).toContain('>Meetings</span>')
+  for (const route of ['', '/meetings']) expect(heading(route)).toContain('>전체 기록</span>')
   for (const [route, label] of [
     ['/chat', 'Ask'], ['/folder/s1', 'Acme &amp; co'], ['/folder/gone', 'Folder'],
     ['/trash', 'Trash'], ['/settings', 'Settings'],

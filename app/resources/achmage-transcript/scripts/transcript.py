@@ -674,7 +674,7 @@ def cmd_lint(args) -> int:
         elif re.match(r"^#{2,4} ", ln):
             section = s
             continue
-        if re.match(r"^\s*\d+[.)]\s", ln):
+        if re.match(r"^\s*\d+[.)]\s", ln) and not (getattr(args, "reader_format", False) and args.profile == "record"):
             errors.append(f"{no}행: 번호 목록 ({s[:30]})")
         if re.match(r"^\s*[*+]\s", ln):
             errors.append(f"{no}행: '-'가 아닌 불릿 ({s[:30]})")
@@ -686,7 +686,7 @@ def cmd_lint(args) -> int:
             errors.append(f"{no}행: HTML 태그 ({s[:30]})")
         if re.search(r"!\[[^\]]*\]\(", s) or "![[" in s:
             errors.append(f"{no}행: 이미지")
-        if re.match(r"^\s*- \[[ xX]\]", ln):
+        if re.match(r"^\s*- \[[ xX]\]", ln) and not (getattr(args, "reader_format", False) and args.profile == "record"):
             errors.append(f"{no}행: 체크박스")
         ml = LEFTOVER_LABEL_RE.search(s)
         if ml:
@@ -932,6 +932,7 @@ def main() -> int:
     p.add_argument("--profile", choices=("record", "minutes"), default="record", help="record: 풀텍스트 정리, minutes: 배포용 회의록")
     p.add_argument("--target", choices=("note", "pele"), default="note", help="note: 노트 앱이 직접 그림, pele: Pele가 그림으로 바꿔 넣음(HWPX 등)")
     p.add_argument("--max-depth", type=int, default=3)
+    p.add_argument("--reader-format", action="store_true", help="Achmage Yogurt personal records: allow numbered procedures and checklists")
     p.set_defaults(fn=cmd_lint)
 
     p = sub.add_parser("facts", help="노트의 숫자 중 출처 파일에 없는 것 나열")
