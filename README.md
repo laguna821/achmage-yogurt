@@ -4,7 +4,8 @@
 
 - 마이크·컴퓨터 소리 녹음과 로컬 Whisper 전사
 - 음성·영상 드롭, 기존 TXT/MD/SRT/VTT/Whisper JSON/PDF/DOCX 전사 가져오기, 음성과 전사 함께 가져오기
-- Plaud 공식 MCP 계정 연결과 원음 가져오기 → 로컬 재전사 ([0.6.2 개발판 안내](docs/PLAUD.md))
+- Plaud 공식 MCP 연결: 기존 전사·화자·정리본 가져오기 → Achmage 정리 준비, 선택적 원음 보관 및 별도 로컬 재전사 ([사용법](docs/PLAUD.md))
+- 서로 다른 기록의 구독 AI 정리 병렬 실행, 기록별 진행 표시와 취소·알림 관리
 - YouTube 자막의 롤링 중복 정규화, 원문 언어 자막 우선 선택, 기존 자막 재사용
 - 전체 문서 최종 편집: 중복 주제 통합, 개념·절차·비교 중심 구성, 본문 타임라인 생략과 별도 근거 보기
 - YouTube 개별 링크: 로컬 음성 전사 또는 기존 자막 가져오기 구분, 구간 선택, 작업 상태·중단·재시작
@@ -18,7 +19,7 @@
 
 ## 설치
 
-[Releases](https://github.com/laguna821/achmage-yogurt/releases)에서 플랫폼에 맞는 파일을 받으세요. 공개 배포본은 로그인 없이 다운로드할 수 있습니다. 현재 버전은 **0.6.1-achmage.1**입니다.
+[Releases](https://github.com/laguna821/achmage-yogurt/releases)에서 플랫폼에 맞는 파일을 받으세요. 공개 배포본은 로그인 없이 다운로드할 수 있습니다. 현재 버전은 **0.6.2-achmage.4**입니다.
 
 | 플랫폼 | 파일 | 상태 |
 | --- | --- | --- |
@@ -48,7 +49,7 @@ Gmail은 설정에서 본인의 Google OAuth 데스크톱 클라이언트를 등
 - TXT처럼 시간 정보가 없는 전사는 시각을 만들어 붙이거나 음성과 문장 위치를 자동 연결하지 않습니다.
 - PDF는 텍스트 PDF를 지원합니다. 스캔 PDF의 OCR은 현재 포함하지 않습니다. 이미지는 선택한 AI로 내용을 읽습니다.
 - YouTube는 공개 영상 기준입니다. 사이트의 로그인 요구·차단·자막 제공 여부에 따라 실패할 수 있습니다. 비공개·유료 영상 우회나 DRM 해제 기능은 없습니다.
-- 설치형 0.6.1과 별도로 [모바일 웹 베타](https://laguna821.github.io/achmage-yogurt/)를 제공합니다. [기능·검증·제약](docs/MOBILE-BETA.md)을 확인하세요. Qwen/Gemma ASR 교체와 App Store 배포는 포함하지 않습니다.
+- 설치형과 별도로 [모바일 웹 베타](https://laguna821.github.io/achmage-yogurt/)를 제공합니다. [기능·검증·제약](docs/MOBILE-BETA.md)을 확인하세요. Qwen/Gemma ASR 교체와 App Store 배포는 포함하지 않습니다.
 - 자동 업데이트는 비활성화했습니다. 새 버전은 Releases에서 받아 설치합니다. GitHub Actions는 수동 실행만 가능하며 이번 배포는 로컬 빌드로 만들었습니다.
 
 개발·배포는 [RELEASE.md](docs/RELEASE.md), 검증 결과와 한계는 [VALIDATION.md](docs/VALIDATION.md), 설계는 [PLAN.md](docs/PLAN.md)를 참고하세요.
@@ -57,4 +58,4 @@ Gmail은 설정에서 본인의 Google OAuth 데스크톱 클라이언트를 등
 
 기반 Yogurt는 Frigade의 MIT 소프트웨어입니다. 원래 저작권 고지와 [LICENSE](LICENSE)를 유지합니다. Achmage 로고 자산과 27개 팔레트는 요청받은 참조를 사용했으며 타사 서비스의 제휴·공식 앱을 뜻하지 않습니다. 포함된 Node, CPython, Codex, FFmpeg, yt-dlp 및 라이브러리의 별도 라이선스·버전은 설치본 `resources/licenses`와 `resources/tools/manifest.json`에 있습니다. FFmpeg 정적 빌드에는 GPL/LGPL 의무가 별도로 적용됩니다.
 
-공통 라이브 편집기의 [Pele 도식·소스 편집](docs/PELE-EDITOR.md)과 [아이폰 모바일 시험 실행계획](docs/MOBILE-TEST-PLAN.md)을 참고하세요. `app/mobile-lab`은 로컬 Whisper 전사·암호화 기록함·선택형 AI 연결을 제공하는 모바일 베타입니다. 아이폰 실제 ASR 속도와 Turbo 안정성은 아직 검증 전입니다.
+공통 라이브 편집기의 [Pele 도식·소스 편집](docs/PELE-EDITOR.md)과 [아이폰 모바일 시험 실행계획](docs/MOBILE-TEST-PLAN.md)을 참고하세요. `app/mobile-lab`은 로컬 Whisper 전사·암호화 기록함·선택형 AI 연결을 제공하는 모바일 베타입니다. iPhone에서 전사 성공은 사용자 확인을 받았지만 장시간 성능은 미측정입니다. Turbo는 초기화 중 페이지 재시작이 확인되어 iPhone/iPad에서 차단하며 Small/Tiny + CPU를 명시적으로 선택합니다.
