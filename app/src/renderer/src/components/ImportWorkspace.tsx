@@ -1,3 +1,4 @@
+import { PlaudWorkspace } from './PlaudWorkspace'
 import { useEffect,useState } from 'react'
 import { FileUp,Link,FolderOpen,RefreshCw,X } from 'lucide-react'
 import { Modal } from './Modal'
@@ -25,7 +26,7 @@ export function ImportWorkspace({onOpen}:{onOpen:(id:string)=>void}){
   const researchStatus=(s:VideoState)=>s.research.find(r=>['queued','searching','writing'].includes(r.phase))?.message
   const organizing=videoJobs.filter(s=>['queued','downloading','frames','reading','organizing','checking','failed','interrupted'].includes(s.phase)||researchStatus(s)).slice(0,3)
   return <>
-    <div className="import-actions"><button data-testid="import-files" onClick={()=>{setTab('file');setOpen(true)}}><FileUp size={17}/>음성·전사 가져오기</button><button data-testid="import-link" onClick={()=>{setTab('url');setOpen(true)}}><Link size={17}/>YouTube 정리</button><button onClick={()=>setOpen(true)}>가져오기 작업 {pendingJobs.length>0&&`· ${pendingJobs.length}`}</button></div>
+    <div className="import-actions"><button data-testid="import-files" onClick={()=>{setTab('file');setOpen(true)}}><FileUp size={17}/>음성·전사 가져오기</button><button data-testid="import-link" onClick={()=>{setTab('url');setOpen(true)}}><Link size={17}/>YouTube 정리</button><PlaudWorkspace onOpen={onOpen}/><button onClick={()=>setOpen(true)}>가져오기 작업 {pendingJobs.length>0&&`· ${pendingJobs.length}`}</button></div>
     {recent.length>0&&<div className="import-progress" role="status">{recent.map(j=><div key={j.id} data-stage={j.stage} data-job-id={j.id}><strong>{j.title}</strong><span>{j.message}</span>{['failed','interrupted'].includes(j.stage)&&<button onClick={()=>void window.yogurt.imports.retry(j.id)}>다시 시작</button>}{j.meetingId&&<button onClick={()=>onOpen(j.meetingId!)}>기록 열기</button>}{isImportFinished(j.stage)&&<button aria-label={j.title+' 알림 닫기'} title="알림만 닫습니다. 원본과 정리 문서는 보존됩니다." onClick={()=>void dismiss(j.id)}><X size={14}/>알림 닫기</button>}</div>)}</div>}
     {organizing.length>0&&<div className="import-progress video-import-progress" data-testid="video-import-progress" role="status">{organizing.map(s=><div key={s.meetingId} data-stage={s.phase}><strong>영상 정리 · {s.metadata.title}</strong><span>{researchStatus(s)||s.message}</span><button onClick={()=>onOpen(s.meetingId)}>진행·결과 열기</button></div>)}</div>}
     {!open&&error&&<p role="alert" className="import-error">{error}</p>}

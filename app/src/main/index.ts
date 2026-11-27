@@ -1,3 +1,4 @@
+import { hookPlaud } from './plaud'
 import { migrateLegacyProfile } from './profileMigration'
 import { hookNoteVersions } from './noteVersions'
 import { hookImports,importedTranscriptInfo, type ImportManager } from './imports'
@@ -807,6 +808,7 @@ app.whenReady().then(async () => {
     await joinParts(dir)
   })
   importer = hookImports({ completed:(id,options)=>{if(options&&options.depth!=='transcript')try{videoHost?.start(id,options)}catch(e){console.error('영상 정리 등록 실패',e)}}, root: userDataDir(), store, window: () => win, changed: () => { win?.webContents.send('meetings:changed'); }, available: () => setup.state.phase === 'ready' && !!setup.installed()?.asr && !activeMeeting() && !backfilling, recording: () => !!activeMeeting() || backfilling, transcribe: transcribeRecorded })
+  hookPlaud(userDataDir(), importer)
   // meetings whose notes a quit or crash cut short: caught up once the models are ready, one at a time
   let caughtUp = false
   // and meetings not in the library yet (or changed since) are indexed, once nothing else is waiting

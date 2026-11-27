@@ -1,3 +1,4 @@
+import { PlaudConnectionSettings } from './PlaudWorkspace'
 import { useEffect, useState } from 'react'
 import type { GmailStatus } from '../../../main/organizer/gmail'
 
@@ -11,6 +12,7 @@ export function SourceConnectionSettings() {
   const act = async (fn: () => Promise<GmailStatus>) => { setBusy(true); setError(''); try { setState(await fn()) } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setBusy(false) } }
   return <section data-testid="source-connection-settings">
     <h2 className="settings-section-heading">자료 연결</h2>
+    <PlaudConnectionSettings/>
     <div className="settings-group">
       <div className="settings-row"><div className="settings-row-copy"><p className="settings-label">Gmail</p><p className="settings-description">{state?.connected ? `${state.account || 'Google 계정'} · 읽기 연결됨` : '이 컴퓨터에서 사용할 Google 계정을 연결하세요.'}</p><p className="settings-description">{state?.message}</p></div></div>
       {!state?.configured && <div className="settings-row"><div className="settings-row-copy"><p className="settings-label">처음 연결하기</p><p className="settings-description">개인용 Google Desktop OAuth 클라이언트를 만들고 내려받은 JSON을 등록하면, 이후에는 Google 로그인으로 연결합니다.</p></div><button className="workspace-button settings-action" onClick={() => void window.yogurt.organizer.gmail.guide()}>Google 설정 안내</button></div>}

@@ -47,7 +47,8 @@ export class ImportManager {
     if((!files.length&&!url)||files.length>2||files.filter(f=>f.kind==='media').length>1||files.filter(f=>f.kind==='transcript').length>1||url&&files.length)throw new Error('음성/동영상 1개와 전사 1개를 함께 넣거나 YouTube 링크를 입력하세요.')
     const start=Number(raw.start||0),end=raw.end==null||raw.end===0?undefined:Number(raw.end)
     if(!Number.isFinite(start)||start<0||end!==undefined&&(!Number.isFinite(end)||end<=start))throw new Error('영상 구간의 시작/종료 초를 확인하세요.')
-    const j:ImportJob={video:url&&raw.video?videoOptions(raw.video):undefined,id:randomUUID(),title:typeof raw.title==='string'&&raw.title.trim()?raw.title.trim().slice(0,200):files[0]?.name.replace(/\.[^.]+$/,'')||'YouTube 영상',files,url,caption:!!raw.caption,start,end,stage:'queued',message:'가져오기를 기다리고 있습니다.',createdAt:Date.now(),updatedAt:Date.now()}
+    const externalSource=raw.externalSource?.provider==='plaud'&&typeof raw.externalSource.id==='string'&&/^[a-zA-Z0-9_-]{1,160}$/.test(raw.externalSource.id)?{provider:'plaud' as const,id:raw.externalSource.id}:undefined
+    const j:ImportJob={externalSource,video:url&&raw.video?videoOptions(raw.video):undefined,id:randomUUID(),title:typeof raw.title==='string'&&raw.title.trim()?raw.title.trim().slice(0,200):files[0]?.name.replace(/\.[^.]+$/,'')||'YouTube 영상',files,url,caption:!!raw.caption,start,end,stage:'queued',message:'가져오기를 기다리고 있습니다.',createdAt:Date.now(),updatedAt:Date.now()}
     this.save(j,'queued',j.message);this.kick();return structuredClone(j)
   }
   cancel(id:string){const j=this.jobs.get(id);if(!j||j.stage==='done')return;if(this.current?.id===id)this.current.abort.abort();this.save(j,'cancelled','작업을 중단했습니다. 원본과 완료된 단계는 남아 있습니다.')}
@@ -73,7 +74,7 @@ export class ImportManager {
     if(!j.meetingId){const now=Date.now(),m=this.d.store.createMeeting({title:j.title,titleSource:'user',startedAt:now,endedAt:now,state:'stopped',eventId:null,app:null,attendees:[],language:'korean'});j.meetingId=m.id}
     const id=j.meetingId,dir=join(this.d.root,'meetings',id),original=join(dir,'original');mkdirSync(original,{recursive:true})
     // Persist identity before the first network/model step, including failed or interrupted imports.
-    const saveSource=()=>{const path=join(dir,'import-source.json');writeFileSync(path+'.tmp',JSON.stringify({jobId:j.id,url:j.url,video:j.video,caption:!!j.caption,transcriptSource:j.transcriptSource,captionLanguage:j.captionLanguage,captionAutomatic:j.captionAutomatic,captionFallback:j.captionFallback,start:j.start,end:j.end,assets:j.assets,importedAt:j.createdAt},null,2),{mode:0o600});renameSync(path+'.tmp',path)}
+    const saveSource=()=>{const path=join(dir,'import-source.json');writeFileSync(path+'.tmp',JSON.stringify({jobId:j.id,externalSource:j.externalSource,url:j.url,video:j.video,caption:!!j.caption,transcriptSource:j.transcriptSource,captionLanguage:j.captionLanguage,captionAutomatic:j.captionAutomatic,captionFallback:j.captionFallback,start:j.start,end:j.end,assets:j.assets,importedAt:j.createdAt},null,2),{mode:0o600});renameSync(path+'.tmp',path)}
     saveSource();this.save(j,j.url?'downloading':'copying',j.url?'YouTube 원본을 준비하고 있습니다.':'원본 자료를 준비하고 있습니다.')
     const originals:string[]=[];j.assets??=[]
     for(const [n,file]of j.files.entries()){

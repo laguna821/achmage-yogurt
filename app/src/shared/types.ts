@@ -38,6 +38,7 @@ export type YogurtApi = {
   }
   speech: { get():Promise<{selected:string;models:{id:string;name:string;bytes:number}[]}>; select(id:string):Promise<{ok:boolean;message:string}> }
   versions: { restore(id:string,revision:string,expected:string|null):Promise<boolean>; list(id: string): Promise<{id:string;side:string;reason:string;createdAt:number;chars:number}[]>; read(id:string,revision:string):Promise<{text:string;side:string}|undefined>; candidate(id:string):Promise<string|undefined>; accept(id:string,expected:string):Promise<boolean> }
+  plaud: import('./plaud').PlaudAPI
   imports: { dismiss(id:string):Promise<void>; dismissFinished():Promise<void>; info(id:string):Promise<{timed:boolean;kind:string}|undefined>; pick(): Promise<import('./imports').ImportFile[]>; describe(paths: string[]): Promise<import('./imports').ImportFile[]>; filePath(file: File): string; start(request: import('./imports').ImportRequest): Promise<import('./imports').ImportJob>; list(): Promise<import('./imports').ImportJob[]>; cancel(id: string): Promise<void>; retry(id: string): Promise<void>; tools(): Promise<{name:string;ready:boolean;version:string}[]>; onChange(cb: (jobs: import('./imports').ImportJob[])=>void): ()=>void }
   appearance: { get(): Promise<import('./appearance').Appearance>; set(patch: Partial<import('./appearance').Appearance>): Promise<import('./appearance').Appearance>; onChange(cb: (state: import('./appearance').Appearance) => void): () => void }
   organizer: {

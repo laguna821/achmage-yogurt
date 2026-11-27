@@ -128,3 +128,17 @@ html[data-skin] :focus-visible { outline-color:var(--focus); }
 .video-import-status { padding:10px 14px;margin:12px 0;border-radius:8px;background:var(--accent-soft);color:var(--ink); }
 
 .import-job-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap; }
+
+/* Plaud source picker shares the app's theme and bounded modal layout. */
+.plaud-body { display: flex; flex-direction: column; gap: 16px; }
+.plaud-connection { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.plaud-connection p { margin: 0; overflow-wrap: anywhere; }
+.plaud-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.plaud-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
+.plaud-recordings { display: flex; flex-direction: column; max-height: min(40vh, 400px); overflow-y: auto; }
+.plaud-recording { display: flex; align-items: center; gap: 12px; padding: 14px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.plaud-recording > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.plaud-recording strong { overflow-wrap: anywhere; }
+.plaud-recording small { opacity: .75; }
+.import-body .plaud-recording input { flex: 0 0 auto; width: auto; }
+[data-testid="plaud-dialog"] .modal-actions button { display: inline-flex; align-items: center; gap: 6px; }
