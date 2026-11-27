@@ -30,6 +30,10 @@ export type Note = {
     complete: boolean;
   };
   aiParts?: number;
+  asrSelection?: {
+    model: "tiny" | "small" | "turbo";
+    device: "webgpu" | "wasm";
+  };
   asrAttempt?: {
     phase: "download" | "initialize" | "decode" | "transcribe";
     state: "running" | "paused" | "error";

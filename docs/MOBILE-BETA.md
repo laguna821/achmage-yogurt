@@ -81,3 +81,13 @@ Playwright Chromium이 필요하다. 스모크 출력은 시스템 임시 폴더
 `node app/scripts/mobile-recovery-smoke.mjs`는 ASR worker를 모의 처리하고 실제 브라우저 녹음·암호화 저장·해독을 사용해 초기화/추론 중 reload → 잠금 해제 → 원본 복구 → CPU 재시도 완료를 검증한다. 실제 iPhone의 메모리 안정성 검증은 아니다.
 
 실패 및 변경 가설: `research:rr-50736ec4d3e9387ca3df4fa05d9ec503:df8ed8151834f92b35ff2d5c2dd981540a6dc8e4f5488975338d43786888d0d2`.
+
+### Turbo 초기화 반복 실패 차단 (2026-11-27, 모바일 0.1.4)
+
+사용자 진단: iPhone에서 Turbo/WebGPU, `initialize/running`, 완료 0구간, 약 108초 녹음으로 페이지가 다시 시작됨. 초기화 단계는 확인됐지만 OS 메모리 부족 종료로 확정할 로그는 없다. 이 베타는 iPhone/iPad Turbo를 실행 중지한다. 모든 아이폰에서 기술적으로 불가능하다는 주장이 아닌 현재 제품의 지원 정책이다. 데스크톱 GPU Turbo는 유지한다.
+
+Turbo 기록에는 **Small + CPU로 전환**을 제공한다. 전사 시작 전에 새 선택을 암호화 저장해 재열기 때 Turbo로 되돌아가지 않도록 한다. 직전 실패 진단은 기존 model/device/asrAttempt에, 다음 실행 선택은 asrSelection에 따로 보존한다. 선택만으로 ASR을 자동 시작하지 않으며 원본 녹음·기존 구간을 지우지 않는다. 완료 구간이 있을 때 모델 변경은 막는다.
+
+UI 실행 버튼과 worker 내부에서 모두 iPhone Turbo를 차단하며 설정의 Turbo 항목을 비활성화한다. `mobile-turbo-recovery-smoke.mjs`는 새 합성 녹음에 이전 버전 실패 상태를 넣고 모델 다운로드 없음, Small CPU 전환 후 새로고침 유지, 녹음 암호문 바이트 동일, 명시적 재시도 완료를 검사한다(ASR worker는 모의). 물리 iPhone의 Small CPU 안정성은 여전히 미검증이다.
+
+진단 원본 근거: `research:rr-50736ec4d3e9387ca3df4fa05d9ec503:cdbab0892c1b5f846c0a30902c949e0a5a0e4127ac9dda73973a6dff9b5394f8`.

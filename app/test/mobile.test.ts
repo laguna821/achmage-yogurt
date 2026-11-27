@@ -125,3 +125,34 @@ describe("resume source identity", () => {
     ).rejects.toThrow();
   }, 10000);
 });
+
+describe("mobile ASR availability", () => {
+  it("blocks Turbo on Apple mobile before download while preserving desktop GPU and smaller CPU models", async () => {
+    const { isAppleMobile, asrUnavailable } =
+      await import("../mobile-lab/core/models");
+    expect(
+      isAppleMobile({
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)",
+      }),
+    ).toBe(true);
+    expect(
+      isAppleMobile({
+        userAgent: "Macintosh",
+        platform: "MacIntel",
+        maxTouchPoints: 5,
+      }),
+    ).toBe(true);
+    expect(
+      isAppleMobile({
+        userAgent: "Macintosh",
+        platform: "MacIntel",
+        maxTouchPoints: 0,
+      }),
+    ).toBe(false);
+    expect(asrUnavailable("turbo", "webgpu", true)).toContain("중지");
+    expect(asrUnavailable("turbo", "wasm", false)).toContain("GPU 전용");
+    expect(asrUnavailable("turbo", "webgpu", false)).toBeUndefined();
+    expect(asrUnavailable("small", "wasm", true)).toBeUndefined();
+    expect(asrUnavailable("tiny", "wasm", true)).toBeUndefined();
+  });
+});

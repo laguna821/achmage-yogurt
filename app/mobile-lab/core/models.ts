@@ -25,3 +25,25 @@ export const MODELS = {
   },
 } as const;
 export type ModelId = keyof typeof MODELS;
+
+/** Availability policy, not a claim about every Apple device's memory limit. */
+export function isAppleMobile(nav: {
+  userAgent: string;
+  platform?: string;
+  maxTouchPoints?: number;
+}) {
+  return (
+    /iPhone|iPad|iPod/.test(nav.userAgent) ||
+    (nav.platform === "MacIntel" && (nav.maxTouchPoints || 0) > 1)
+  );
+}
+export function asrUnavailable(
+  model: ModelId,
+  device: "webgpu" | "wasm",
+  appleMobile: boolean,
+): string | undefined {
+  if (model === "turbo" && appleMobile)
+    return "이 모바일 베타에서는 iPhone·iPad의 Turbo 실행을 중지했습니다. 초기화 중 페이지 재시작이 확인됐습니다. 아래에서 Small + CPU 또는 Tiny + CPU를 선택하세요.";
+  if (model === "turbo" && device !== "webgpu")
+    return "현재 Turbo 파일은 GPU 전용입니다. CPU를 사용하려면 Small 또는 Tiny로 모델도 바꿔야 합니다.";
+}

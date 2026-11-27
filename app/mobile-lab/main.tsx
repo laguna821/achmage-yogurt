@@ -14,7 +14,12 @@ import {
   deleteNote,
   sourceFingerprint,
 } from "./core/records";
-import { MODELS, type ModelId } from "./core/models";
+import {
+  MODELS,
+  type ModelId,
+  isAppleMobile,
+  asrUnavailable,
+} from "./core/models";
 import { Asr } from "./core/asr";
 import { importWeights, modelCacheName } from "./core/modelCache";
 import { openAudio, recordedSource, CHUNK_SECONDS } from "./core/audio";
@@ -28,10 +33,8 @@ import {
 } from "./core/organize";
 import "../src/renderer/src/achmage.css";
 import "./style.css";
-const VERSION = "모바일 베타 0.1.3";
-const appleMobile =
-  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const VERSION = "모바일 베타 0.1.4";
+const appleMobile = isAppleMobile(navigator);
 const asrPhase = {
   download: "모델 다운로드·검증",
   initialize: "모델 실행 준비",
@@ -273,8 +276,9 @@ function App() {
     setShowRaw(false);
     setRaw("");
     if (n.kind === "audio" && n.model && n.model in MODELS) {
-      setModel(n.model as ModelId);
-      if (n.device) setDevice(n.device);
+      setModel(n.asrSelection?.model || (n.model as ModelId));
+      if (n.asrSelection?.device || n.device)
+        setDevice(n.asrSelection?.device || n.device!);
       if (n.language) setLanguage(n.language);
     }
     setTab("records");
@@ -330,9 +334,37 @@ function App() {
         );
       }
     });
+  const selectASRProfile = (
+    nextModel: ModelId,
+    nextDevice: "webgpu" | "wasm",
+  ) =>
+    void run(async () => {
+      const n = active.current!;
+      if (n.next && n.model !== nextModel)
+        throw Error("이미 전사한 구간이 있어 모델을 바꿀 수 없습니다.");
+      const unavailable = asrUnavailable(nextModel, nextDevice, appleMobile);
+      if (unavailable) throw Error(unavailable);
+      await persist({
+        ...n,
+        asrSelection: { model: nextModel, device: nextDevice },
+      });
+      await vault.put(key!, "settings", {
+        ai: settings,
+        model: nextModel,
+        device: nextDevice,
+        language,
+      });
+      setModel(nextModel);
+      setDevice(nextDevice);
+      setStatus(
+        `${nextModel === "tiny" ? "Tiny + CPU를 선택했습니다. 한국어 품질이 낮은 동작 확인용입니다." : "Small + CPU를 선택했습니다. Turbo보다 작은 모델이며 정확도·속도는 다를 수 있습니다."} 선택을 저장했습니다. 아래 전사 시작 버튼을 누르세요.`,
+      );
+    });
   const transcribe = () =>
     void run(async (signal) => {
       let n = active.current!;
+      const unavailable = asrUnavailable(model, device, appleMobile);
+      if (unavailable) throw Error(unavailable);
       let input: Parameters<typeof openAudio>[0];
       if (file) {
         const identity = await sourceFingerprint(file, signal, (p) =>
@@ -365,6 +397,7 @@ function App() {
         n = {
           ...n,
           duration: audio.duration,
+          asrSelection: undefined,
           model,
           device,
           language,
@@ -1171,6 +1204,7 @@ function App() {
                               model: note.model,
                               device: note.device,
                               attempt: note.asrAttempt,
+                              nextSelection: note.asrSelection,
                               completedChunks: note.next,
                               duration: note.duration,
                             },
@@ -1193,6 +1227,25 @@ function App() {
                 실행 방식:{" "}
                 {device === "wasm" ? "CPU (WASM)" : "GPU (WebGPU · 실험)"}
               </p>
+              {asrUnavailable(model, device, appleMobile) &&
+                note.status !== "done" && (
+                  <section className="notice" role="status">
+                    <div>
+                      <strong>Turbo를 다시 실행하지 않습니다</strong>
+                      <p>{asrUnavailable(model, device, appleMobile)}</p>
+                      <p>
+                        기존 녹음은 유지됩니다. 모델 변경은 아래 버튼을 눌렀을
+                        때만 적용됩니다.
+                      </p>
+                      {note.next > 0 && (
+                        <p>
+                          이미 전사한 구간이 있어 이 기록의 모델을 바꿀 수
+                          없습니다. 새 기록에 원본을 가져와 전사하세요.
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                )}
               {appleMobile && (
                 <p className="meta">
                   iPhone에서는 CPU를 기본으로 사용합니다. GPU 지원 표시만으로
@@ -1202,29 +1255,22 @@ function App() {
               )}
               {note.status !== "done" && !busy && (
                 <div className="controls">
-                  {model !== "turbo" && device === "webgpu" && (
+                  {note.next === 0 && model === "turbo" && (
                     <button
-                      onClick={() => {
-                        setDevice("wasm");
-                        setStatus(
-                          "같은 모델을 CPU로 실행하도록 선택했습니다. 아래 전사 버튼을 누르세요. 모델 파일은 캐시가 남아 있으면 다시 다운로드하지 않습니다.",
-                        );
-                      }}
+                      className="primary"
+                      onClick={() => selectASRProfile("small", "wasm")}
                     >
+                      Small + CPU로 전환
+                    </button>
+                  )}
+                  {model !== "turbo" && device === "webgpu" && (
+                    <button onClick={() => selectASRProfile(model, "wasm")}>
                       같은 모델 · CPU로 전환
                     </button>
                   )}
                   {note.next === 0 &&
                     (model !== "tiny" || device !== "wasm") && (
-                      <button
-                        onClick={() => {
-                          setModel("tiny");
-                          setDevice("wasm");
-                          setStatus(
-                            "Tiny + CPU를 선택했습니다. 한국어 정확도가 낮은 동작 확인용입니다. 아래 전사 버튼을 누르면 약 41 MB 모델을 준비합니다.",
-                          );
-                        }}
-                      >
+                      <button onClick={() => selectASRProfile("tiny", "wasm")}>
                         가벼운 동작 확인 · Tiny + CPU
                       </button>
                     )}
@@ -1254,7 +1300,10 @@ function App() {
                 <button
                   className="primary"
                   disabled={
-                    busy || (!file && !note.recording) || note.status === "done"
+                    busy ||
+                    (!file && !note.recording) ||
+                    note.status === "done" ||
+                    !!asrUnavailable(model, device, appleMobile)
                   }
                   onClick={transcribe}
                 >
@@ -1467,8 +1516,15 @@ function App() {
                 onChange={(e) => setModel(e.target.value as ModelId)}
               >
                 {Object.entries(MODELS).map(([id, m]) => (
-                  <option key={id} value={id}>
+                  <option
+                    key={id}
+                    value={id}
+                    disabled={appleMobile && id === "turbo"}
+                  >
                     {m.label}
+                    {appleMobile && id === "turbo"
+                      ? " · iPhone/iPad 사용 중지"
+                      : ""}
                   </option>
                 ))}
               </select>
@@ -1476,6 +1532,9 @@ function App() {
             <p>
               {MODELS[model].download} · {MODELS[model].hint}
             </p>
+            {asrUnavailable(model, device, appleMobile) && (
+              <p role="status">{asrUnavailable(model, device, appleMobile)}</p>
+            )}
             <label>
               실행 방식
               <select

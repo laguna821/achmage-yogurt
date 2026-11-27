@@ -1,6 +1,6 @@
 import { prepareWeights, modelCacheName } from "./modelCache";
 import { env, pipeline } from "@huggingface/transformers";
-import { MODELS, type ModelId } from "./models";
+import { MODELS, type ModelId, isAppleMobile, asrUnavailable } from "./models";
 env.allowLocalModels = false;
 env.useBrowserCache = false;
 env.useCustomCache = true;
@@ -13,6 +13,12 @@ self.onmessage = async (event: MessageEvent) => {
     if (action === "prepare" || action === "load") {
       const m = MODELS[model as ModelId];
       if (!m) throw Error("알 수 없는 모델입니다.");
+      const unavailable = asrUnavailable(
+        model,
+        device,
+        isAppleMobile(navigator),
+      );
+      if (unavailable) throw Error(unavailable);
       if (device === "webgpu") {
         const adapter = await (navigator as any).gpu?.requestAdapter();
         if (!adapter)
