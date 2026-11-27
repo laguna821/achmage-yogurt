@@ -1,3 +1,4 @@
+import { useRecordActivity } from '../useRecordActivity'
 import { PlaudWorkspace } from './PlaudWorkspace'
 import { useEffect,useState } from 'react'
 import { FileUp,Link,FolderOpen,RefreshCw,X } from 'lucide-react'
@@ -7,6 +8,8 @@ import {VideoOptionsFields} from './VideoWorkspace'
 import { isImportFinished, type ImportFile, type ImportJob } from '../../../shared/imports'
 
 export function ImportWorkspace({onOpen}:{onOpen:(id:string)=>void}){
+  const recordActivity=useRecordActivity()
+  const activeCount=[...recordActivity.values()].filter(a=>a.state==='active'||a.state==='waiting').length
   const [open,setOpen]=useState(false),[tab,setTab]=useState<'file'|'url'>('file'),[files,setFiles]=useState<ImportFile[]>([]),[jobs,setJobs]=useState<ImportJob[]>([])
   const [url,setUrl]=useState(''),[title,setTitle]=useState(''),[caption,setCaption]=useState(true),[start,setStart]=useState(''),[end,setEnd]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false)
   const [video,setVideo]=useState<VideoOptions>({...defaultVideoOptions}),[model,setModel]=useState('')
@@ -20,14 +23,15 @@ export function ImportWorkspace({onOpen}:{onOpen:(id:string)=>void}){
   const drop=async(list:FileList)=>{try{setFiles(await window.yogurt.imports.describe(Array.from(list).map(file=>window.yogurt.imports.filePath(file))));setError('')}catch(e){setError(String(e))}}
   const add=async()=>{setBusy(true);try{await window.yogurt.imports.start(tab==='url'?{url,title,caption,video,start:Number(start),end:end?Number(end):undefined}:{paths:files.map(f=>f.path),title});setFiles([]);setError('');setOpen(false)}catch(e){setError(String(e))}finally{setBusy(false)}}
   const visibleJobs=jobs.filter(j=>!j.dismissedAt)
-  const pendingJobs=visibleJobs.filter(j=>j.stage!=='done')
-  const recent=pendingJobs.slice(0,3)
+  const pendingJobs=visibleJobs.filter(j=>(j.stage!=='done'||j.audioStatus==='pending'||j.audioStatus==='failed'))
+  const recent=pendingJobs.filter(j=>!j.meetingId||isImportFinished(j.stage)&&j.stage!=='done').slice(0,3)
   const dismiss=async(id?:string)=>{try{if(id)await window.yogurt.imports.dismiss(id);else await window.yogurt.imports.dismissFinished();setError('')}catch(e){setError(String(e))}}
   const researchStatus=(s:VideoState)=>s.research.find(r=>['queued','searching','writing'].includes(r.phase))?.message
-  const organizing=videoJobs.filter(s=>['queued','downloading','frames','reading','organizing','checking','failed','interrupted'].includes(s.phase)||researchStatus(s)).slice(0,3)
+  const organizing=videoJobs.filter(s=>['failed','interrupted'].includes(s.phase)).slice(0,3)
   return <>
     <div className="import-actions"><button data-testid="import-files" onClick={()=>{setTab('file');setOpen(true)}}><FileUp size={17}/>음성·전사 가져오기</button><button data-testid="import-link" onClick={()=>{setTab('url');setOpen(true)}}><Link size={17}/>YouTube 정리</button><PlaudWorkspace onOpen={onOpen}/><button onClick={()=>setOpen(true)}>가져오기 작업 {pendingJobs.length>0&&`· ${pendingJobs.length}`}</button></div>
-    {recent.length>0&&<div className="import-progress" role="status">{recent.map(j=><div key={j.id} data-stage={j.stage} data-job-id={j.id}><strong>{j.title}</strong><span>{j.message}</span>{['failed','interrupted'].includes(j.stage)&&<button onClick={()=>void window.yogurt.imports.retry(j.id)}>다시 시작</button>}{j.meetingId&&<button onClick={()=>onOpen(j.meetingId!)}>기록 열기</button>}{isImportFinished(j.stage)&&<button aria-label={j.title+' 알림 닫기'} title="알림만 닫습니다. 원본과 정리 문서는 보존됩니다." onClick={()=>void dismiss(j.id)}><X size={14}/>알림 닫기</button>}</div>)}</div>}
+    {activeCount>0&&<p className="library-work-count" role="status">{activeCount}개 기록 처리 중 · 각 기록에서 진행 상태를 확인하세요.</p>}
+    {recent.length>0&&<div className="import-progress" role="status">{recent.map(j=><div key={j.id} data-stage={j.stage} data-job-id={j.id}><strong>{j.title}</strong><span>{j.message}{j.audioMessage&&<> · {j.audioMessage}</>}</span>{['failed','interrupted'].includes(j.stage)&&<button onClick={()=>void window.yogurt.imports.retry(j.id)}>다시 시작</button>}{j.meetingId&&<button onClick={()=>onOpen(j.meetingId!)}>기록 열기</button>}{isImportFinished(j.stage)&&<button aria-label={j.title+' 알림 닫기'} title="알림만 닫습니다. 원본과 정리 문서는 보존됩니다." onClick={()=>void dismiss(j.id)}><X size={14}/>알림 닫기</button>}</div>)}</div>}
     {organizing.length>0&&<div className="import-progress video-import-progress" data-testid="video-import-progress" role="status">{organizing.map(s=><div key={s.meetingId} data-stage={s.phase}><strong>영상 정리 · {s.metadata.title}</strong><span>{researchStatus(s)||s.message}</span><button onClick={()=>onOpen(s.meetingId)}>진행·결과 열기</button></div>)}</div>}
     {!open&&error&&<p role="alert" className="import-error">{error}</p>}
     {open&&<Modal title="외부 음성과 전사 가져오기" description="음성 원본, 기존 전사 또는 둘 다 가져온 뒤 맥락 자료를 넣고 정리할 수 있습니다." onCancel={()=>setOpen(false)} testId="import-dialog" busy={busy}>
@@ -42,7 +46,7 @@ export function ImportWorkspace({onOpen}:{onOpen:(id:string)=>void}){
       <label className="import-title">기록 제목(선택)<input aria-label="가져올 기록 제목" value={title} onChange={e=>setTitle(e.target.value)} placeholder="원래 파일명 또는 영상 제목 사용"/></label>
       <details><summary>미디어 도구 상태</summary>{tools.map(t=><p key={t.name}>{t.ready?'✓':'!'} {t.name}: {t.version}</p>)}</details>
       {error&&<p role="alert" className="import-error">{error}</p>}
-      <div className="import-job-list"><div className="import-job-heading"><h3>가져오기 작업</h3>{visibleJobs.some(j=>isImportFinished(j.stage))&&<button onClick={()=>void dismiss()}>끝난 작업 내역 지우기</button>}</div><small>내역을 지워도 녹음·전사·정리 문서는 보존됩니다.</small>{!visibleJobs.length&&<p>표시할 작업 내역이 없습니다.</p>}{visibleJobs.map(j=><article key={j.id} data-job-id={j.id}><strong>{j.title}</strong><p>{j.message}</p>{j.captionFallback&&<small>{j.captionFallback}</small>}{j.errorDetail&&<details><summary>기술 정보</summary><pre className="import-error">{j.errorDetail}</pre></details>}<div>{j.meetingId&&<button onClick={()=>{setOpen(false);onOpen(j.meetingId!)}}><FolderOpen size={14}/>기록 열기</button>}{['failed','cancelled','interrupted'].includes(j.stage)&&<button onClick={()=>void window.yogurt.imports.retry(j.id)}><RefreshCw size={14}/>다시 시작</button>}{!['done','failed','cancelled','interrupted'].includes(j.stage)&&<button onClick={()=>void window.yogurt.imports.cancel(j.id)}><X size={14}/>중단</button>}{isImportFinished(j.stage)&&<button onClick={()=>void dismiss(j.id)}><X size={14}/>내역 지우기</button>}</div></article>)}</div>
+      <div className="import-job-list"><div className="import-job-heading"><h3>가져오기 작업</h3>{visibleJobs.some(j=>isImportFinished(j.stage))&&<button onClick={()=>void dismiss()}>끝난 작업 내역 지우기</button>}</div><small>내역을 지워도 녹음·전사·정리 문서는 보존됩니다.</small>{!visibleJobs.length&&<p>표시할 작업 내역이 없습니다.</p>}{visibleJobs.map(j=><article key={j.id} data-job-id={j.id}><strong>{j.title}</strong><p>{j.message}</p>{j.audioMessage&&<p>{j.audioMessage}</p>}{j.captionFallback&&<small>{j.captionFallback}</small>}{j.errorDetail&&<details><summary>기술 정보</summary><pre className="import-error">{j.errorDetail}</pre></details>}<div>{j.meetingId&&<button onClick={()=>{setOpen(false);onOpen(j.meetingId!)}}><FolderOpen size={14}/>기록 열기</button>}{['failed','cancelled','interrupted'].includes(j.stage)&&<button onClick={()=>void window.yogurt.imports.retry(j.id)}><RefreshCw size={14}/>다시 시작</button>}{!['done','failed','cancelled','interrupted'].includes(j.stage)&&<button onClick={()=>void window.yogurt.imports.cancel(j.id)}><X size={14}/>중단</button>}{isImportFinished(j.stage)&&<button onClick={()=>void dismiss(j.id)}><X size={14}/>내역 지우기</button>}</div></article>)}</div>
       </div><div className="modal-actions"><button data-dialog-cancel onClick={()=>setOpen(false)}>닫기</button><button data-testid="import-start" className="primary" disabled={busy||(tab==='file'?!files.length:!url.trim())} onClick={()=>void add()}>{busy?'등록 중…':tab==='url'&&video.depth!=='transcript'?'이 영상 정리하기':'가져오기 시작'}</button></div>
     </Modal>}
   </>

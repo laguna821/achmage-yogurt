@@ -1,3 +1,4 @@
+import { createActivity } from './activity'
 import { hookPlaud } from './plaud'
 import { migrateLegacyProfile } from './profileMigration'
 import { hookNoteVersions } from './noteVersions'
@@ -598,8 +599,10 @@ app.whenReady().then(async () => {
   // 32 GB and up: the notes model reads each meeting in as it happens (notes/readAhead.ts)
   // Subscription requests happen for an explicit summary/chat job, never for background read-ahead.
   const readsAhead = false
-  // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
-  const engine = isFake() ? new FakeEngine() : new SubscriptionEngine(() => subscriptionModel(loadSettings(settingsFile).aiModel), join(userDataDir(), 'subscription-runtime'), () => reasoningEffort(loadSettings(settingsFile).aiReasoningEffort))
+  const activity = createActivity(id => { const m = store.meeting(id); return !!m && m.trashedAt == null }, rows => win?.webContents.send('activity:changed', rows))
+  ipcMain.handle('activity:list', () => activity.list())
+  // Subscription inference runs independently per record; local inference retains recording-first scheduling.
+  const engine = isFake() ? new FakeEngine() : new SubscriptionEngine(() => subscriptionModel(loadSettings(settingsFile).aiModel), join(userDataDir(), 'subscription-runtime'), () => reasoningEffort(loadSettings(settingsFile).aiReasoningEffort), (id, ms) => activity.set(id, 'retry', ms ? 'waiting' : undefined, ms ? `AI 요청 제한 · ${ms / 1000}초 후 재시도` : ''))
   if (!isFake()) hookSubscriptionSettings(userDataDir(), () => !!videoHost?.running() || !!organizerHost?.organizer.running || engine instanceof SubscriptionEngine && engine.busy)
   // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
   const smallMac = isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem())
@@ -607,7 +610,7 @@ app.whenReady().then(async () => {
   // first run: the notes model lands after recording already works; jobs wait in the queue for it
   // the embedding model (meaning search across meetings) runs in the same worker and is let go with the notes model
   const embedder = createEmbedder({ engine, modelPath: () => setup.installed()?.embed, id: bundledCatalog.embedding.id, dims: bundledCatalog.embedding.dims })
-  const queue = createQueue({ recording: () => !!activeMeeting(), smallMac, backlogMs: transcriptionBacklogMs, onIdle: () => { void model.unload().catch(e => console.error('letting the notes model go failed', e)); void embedder.unload() }, modelReady: () => !!setup.notesPath() })
+  const queue = createQueue({ remote: !isFake() || process.env.YOGURT_FAKE_REMOTE === '1', recording: () => !!activeMeeting(), smallMac, backlogMs: transcriptionBacklogMs, onIdle: () => { void model.unload().catch(e => console.error('letting the notes model go failed', e)); void embedder.unload() }, modelReady: () => !!setup.notesPath() })
   ipcMain.handle('setup:remove-upgrade', () => setup.removeUpgrade(remove => queue.enqueue(async () => {
     await model.unload()
     remove()
@@ -632,10 +635,11 @@ app.whenReady().then(async () => {
     busy: id => resumingId === id || stopSavePending(id),
     settle: async id => { await rejoined; await recordingFinished(id); await transcriptFinished(id) },
     removed: id => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('audio:deleted', id) },
-    ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
+    ...(automatic ? { keep: endedAt => importedTranscriptInfo(userDataDir(),id)?.kind==='plaud-transcript' || keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
-  const organizerHost = !isFake() ? createOrganizerHost(userDataDir(), (existsSync(join(process.resourcesPath, 'achmage-transcript')) ? join(process.resourcesPath, 'achmage-transcript') : join(__dirname, '../../resources/achmage-transcript')), (id): id is string => isId(id) && !!store.meeting(id), state => win?.webContents.send('organizer:changed', state)) : undefined
+  const organizerHost = !isFake() ? createOrganizerHost(userDataDir(), (existsSync(join(process.resourcesPath, 'achmage-transcript')) ? join(process.resourcesPath, 'achmage-transcript') : join(__dirname, '../../resources/achmage-transcript')), (id): id is string => isId(id) && !!store.meeting(id), state => { activity.organizer(state); win?.webContents.send('organizer:changed', state) }) : undefined
   let importer: ImportManager | undefined
+  let plaudHost: ReturnType<typeof hookPlaud> | undefined
   const videoSources = new VideoSources(userDataDir(), () => importer?.list())
   let videoHost: ReturnType<typeof createVideoHost> | undefined
   const notes = hookNotes({
@@ -648,13 +652,13 @@ app.whenReady().then(async () => {
     summaryLanguage: () => summaryLanguageSetting(loadSettings(settingsFile)),
     store, queue, model, language: meetingLanguage, onStop: onMeetingStopSaved, named: (id) => callNames.finished(id), earlier: (id) => readAhead.parts(id), me,
     transcribed: async (id) => { await recordingFinished(id); await transcriptFinished(id) },
-    send: (v) => win?.webContents.send('notes:changed', v),
+    send: (v) => { activity.notes(v); win?.webContents.send('notes:changed', v) },
     // the notes are written: the meeting goes into the library for chat across meetings
     changed: () => { win?.webContents.send('meetings:changed'); void indexer.schedule() },
   })
   videoHost = createVideoHost({sources:videoSources,root:userDataDir(),store,queue,model,propose:versions.propose,
     modelKey:()=>`${subscriptionModel(loadSettings(settingsFile).aiModel)} · ${reasoningEffort(loadSettings(settingsFile).aiReasoningEffort)}`,
-    changed:state=>win?.webContents.send('video:changed',state),
+    changed:state=>{activity.video(state);win?.webContents.send('video:changed',state)},
     notesChanged:id=>{win?.webContents.send('notes:changed',notes.view(id));win?.webContents.send('meetings:changed');void indexer.schedule()},
     busy:id=>['waiting','writing'].includes(notes.view(id).status)||!!organizerHost&&['preparing','researching','matching','drafting','checking'].includes(organizerHost.organizer.get(id).phase),
     context:async(id,options,signal)=>{
@@ -709,7 +713,7 @@ app.whenReady().then(async () => {
       win?.webContents.send('conversations:changed', v)
       if (v.chips.length === 1 && v.chips[0].kind === 'meeting') win?.webContents.send('chat:changed', { ...v, meetingId: v.chips[0].id })
     }, sendList: (l) => win?.webContents.send('conversations:list', l),
-    waitsForMeeting: () => smallMac && !!activeMeeting(), waitsForModel: () => !setup.notesPath(),
+    waitsForMeeting: () => isFake() && smallMac && !!activeMeeting(), waitsForModel: () => !setup.notesPath(),
     // a meeting read in ahead during a recording only where reading ahead is allowed (32 GB and up; the fake Mac is big)
     warmAllowed: () => !activeMeeting() || (isFake() ? !smallMac : readAheadAllowed(os.totalmem())),
   })
@@ -808,7 +812,12 @@ app.whenReady().then(async () => {
     await joinParts(dir)
   })
   importer = hookImports({ completed:(id,options)=>{if(options&&options.depth!=='transcript')try{videoHost?.start(id,options)}catch(e){console.error('영상 정리 등록 실패',e)}}, root: userDataDir(), store, window: () => win, changed: () => { win?.webContents.send('meetings:changed'); }, available: () => setup.state.phase === 'ready' && !!setup.installed()?.asr && !activeMeeting() && !backfilling, recording: () => !!activeMeeting() || backfilling, transcribe: transcribeRecorded })
-  hookPlaud(userDataDir(), importer)
+  plaudHost = hookPlaud(userDataDir(), importer, (id,participants,materials,notice) => {
+    const organizer=organizerHost?.organizer;if(!organizer)return
+    const state=organizer.get(id)
+    if(state.revision===0)organizer.configure(id,state.options,{...state.context,notes:notice,participants:'Plaud 전사에 표시된 화자 (자동 식별·사용자 수정 여부는 미확인):\n'+participants.join(', ')})
+    if(materials.length)organizer.attach(id,materials)
+  })
   // meetings whose notes a quit or crash cut short: caught up once the models are ready, one at a time
   let caughtUp = false
   // and meetings not in the library yet (or changed since) are indexed, once nothing else is waiting
@@ -955,9 +964,9 @@ app.whenReady().then(async () => {
   // gone for good, audio too; never while it records
   const removeForGood = (id: unknown) => id === resumingId ? Promise.resolve('failed' as const) : isId(id) && stopSavePending(id) ? Promise.resolve('save-pending' as const) : deleteMeeting(id, {
     store, dirOf: meetingDir,
-    cancel: (id) => { queue.cancel(id); conversations.forgetMeeting(id); indexer.forget(id) },
+    cancel: (id) => { plaudHost?.cancelMeeting(id); importer?.cancelMeeting(id); queue.cancel(id); activity.clear(id); conversations.forgetMeeting(id); indexer.forget(id) },
     // Actual writer completion: deleteMeeting refuses deletion if this wait times out.
-    settle: async (id) => { await Promise.all([recordingFinished(id), transcriptFinished(id)]) },
+    settle: async (id) => { await Promise.all([recordingFinished(id), transcriptFinished(id), importer?.settleMeeting(id)]) },
     removed: (id) => {
       notes.forgetDrafts(id)
       win?.webContents.send('meetings:changed'); win?.webContents.send('folders:changed')
@@ -970,6 +979,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('meetings:trash', (_e, id: unknown) => id === resumingId ? 'failed' : isId(id) && stopSavePending(id) ? 'save-pending' : moveToTrash(id, {
     store,
     moved: (id) => {
+      plaudHost?.cancelMeeting(id); importer?.cancelMeeting(id)
+      queue.cancel(id); activity.clear(id)
       indexer.forget(id)
       win?.webContents.send('meetings:changed'); win?.webContents.send('folders:changed')
       if (route === `/note/${id}`) { route = ''; win?.webContents.send('nav:go', route) }
@@ -977,7 +988,7 @@ app.whenReady().then(async () => {
   }))
   ipcMain.handle('meetings:restore', (_e, id: unknown) => {
     if (!isId(id) || store.meeting(id)?.trashedAt == null) return
-    store.restoreMeeting(id); indexer.restored(id)
+    store.restoreMeeting(id); queue.restore(id); indexer.restored(id)
     win?.webContents.send('meetings:changed'); win?.webContents.send('folders:changed')
   })
   ipcMain.handle('meetings:trashed', () => store.trashed())

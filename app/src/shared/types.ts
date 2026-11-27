@@ -23,6 +23,7 @@ export type MeetingCard = StoredMeetingCard & { paused?: true; category?: 'video
 
 /** What the window sees of the app: window.yogurt (the preload bridge, contextIsolation on) */
 export type YogurtApi = {
+  activity?: { list(): Promise<import('./activity').RecordActivity[]>; onChange(cb: (rows: import('./activity').RecordActivity[]) => void): () => void }
   video: {
     get(id:string):Promise<import('./video').VideoState|undefined>
     start(id:string,options:Partial<import('./video').VideoOptions>):Promise<import('./video').VideoState>

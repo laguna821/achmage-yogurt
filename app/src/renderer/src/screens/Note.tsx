@@ -117,6 +117,12 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const [confirming, setConfirming] = useState(false)
   const [organizerOpen, setOrganizerOpen] = useState(false)
   useEffect(() => {
+    if(hasEnhanced&&notes?.meetingId===id&&sessionStorage.getItem('organizer-prepare:'+id)){
+      sessionStorage.removeItem('organizer-prepare:'+id);picked.current=true
+      setView('enhanced');setPrimary('notes');setOrganizerOpen(true)
+    }
+  },[id,hasEnhanced,notes?.meetingId])
+  useEffect(() => {
     setVideoState(undefined); setVideoOpen(false)
     let active = true, revision = 0
     const refresh = () => { const mine = ++revision; void window.yogurt.video.get(id).then(s => { if (active && mine === revision) setVideoState(s) }).catch(() => {}) }

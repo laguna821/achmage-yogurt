@@ -12,7 +12,8 @@ import type { FolderMemberships } from '../folderSelection'
 import { toasts } from './TrashToast'
 
 /** Metadata and actions share the trailing column without moving the row content. */
-export function MeetingRow({ id, recording, children, selected, targets, memberships, busy, onSelect, onClick, onTrash }: {
+export function MeetingRow({ activity, id, recording, children, selected, targets, memberships, busy, onSelect, onClick, onTrash }: {
+  activity?: import('../../../shared/activity').RecordActivity
   id: string; recording: boolean; children: (openFolders: (suggestedId: string) => void, more: ReactNode) => ReactNode; selected: boolean; targets: string[]; busy: boolean
   memberships: FolderMemberships
   onSelect: () => void; onClick: (event: MouseEvent) => void; onTrash: (ids: string[]) => void
@@ -56,7 +57,7 @@ export function MeetingRow({ id, recording, children, selected, targets, members
     else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); items[e.key === 'Home' ? 0 : items.length - 1]?.focus() }
     else if (e.key === 'Tab') close()
   }
-  return <li ref={row} data-row-id={id} className="native-meeting-row row-swap" data-menu-open={!!open} data-selected={selected}
+  return <li ref={row} data-activity={activity?.state} data-row-id={id} className="native-meeting-row row-swap" data-menu-open={!!open} data-selected={selected}
     onClickCapture={e => { if (row.current?.contains(e.target as Node) && (e.target as HTMLElement).closest('.native-meeting-link')) onClick(e) }}
     onContextMenu={(e) => { if (!row.current?.contains(e.target as Node)) return; e.preventDefault(); show({ x: e.clientX, y: e.clientY }) }}
     onKeyDown={(e) => {

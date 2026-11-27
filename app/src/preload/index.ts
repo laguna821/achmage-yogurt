@@ -4,6 +4,7 @@ import { capabilities, platformOf } from '../shared/platform'
 import type { ChatView, ConversationSummary, ConversationView, NoteView, PromptAction, SetupState, UpdateStatus, WidgetView, YogurtApi } from '../shared/types'
 
 const api: YogurtApi = {
+  activity: { list: () => ipcRenderer.invoke('activity:list'), onChange: cb => { const fn = (_e: unknown, rows: import('../shared/activity').RecordActivity[]) => cb(rows); ipcRenderer.on('activity:changed', fn); return () => { ipcRenderer.off('activity:changed', fn) } } },
   video: {
     get:id=>ipcRenderer.invoke('video:get',id),start:(id,options)=>ipcRenderer.invoke('video:start',id,options),cancel:id=>ipcRenderer.invoke('video:cancel',id),
     answer:(id,answers)=>ipcRenderer.invoke('video:answer',id,answers),frame:(id,frameId,patch)=>ipcRenderer.invoke('video:frame',id,frameId,patch),applyChanges:id=>ipcRenderer.invoke('video:apply-changes',id),
@@ -12,7 +13,7 @@ const api: YogurtApi = {
   },
   speech: {get:()=>ipcRenderer.invoke('speech:get'),select:id=>ipcRenderer.invoke('speech:select',id)},
   versions: { restore: (id,revision,expected) => ipcRenderer.invoke('versions:restore',id,revision,expected), list: id => ipcRenderer.invoke('versions:list',id), read: (id,revision) => ipcRenderer.invoke('versions:read',id,revision), candidate: id => ipcRenderer.invoke('versions:candidate',id), accept: (id,expected) => ipcRenderer.invoke('versions:accept',id,expected) },
-  plaud: { status: () => ipcRenderer.invoke('plaud:status'), connect: () => ipcRenderer.invoke('plaud:connect'), disconnect: () => ipcRenderer.invoke('plaud:disconnect'), list: page => ipcRenderer.invoke('plaud:list',page), import: id => ipcRenderer.invoke('plaud:import',id), cancel: () => ipcRenderer.invoke('plaud:cancel') },
+  plaud: { status: () => ipcRenderer.invoke('plaud:status'), connect: () => ipcRenderer.invoke('plaud:connect'), disconnect: () => ipcRenderer.invoke('plaud:disconnect'), list: page => ipcRenderer.invoke('plaud:list',page), import: (id, options) => ipcRenderer.invoke('plaud:import',id,options), cancel: () => ipcRenderer.invoke('plaud:cancel') },
   imports: { dismiss: id => ipcRenderer.invoke('imports:dismiss', id), dismissFinished: () => ipcRenderer.invoke('imports:dismiss-finished'), info: id => ipcRenderer.invoke('imports:info',id), pick: () => ipcRenderer.invoke('imports:pick'), describe: paths => ipcRenderer.invoke('imports:describe', paths), filePath: file => webUtils.getPathForFile(file), start: request => ipcRenderer.invoke('imports:start', request), list: () => ipcRenderer.invoke('imports:list'), cancel: id => ipcRenderer.invoke('imports:cancel', id), retry: id => ipcRenderer.invoke('imports:retry', id), tools: () => ipcRenderer.invoke('imports:tools'), onChange: cb => { const fn = (_e: unknown, jobs: import('../shared/imports').ImportJob[]) => cb(jobs); ipcRenderer.on('imports:changed', fn); return () => { ipcRenderer.removeListener('imports:changed', fn) } } },
   appearance: { get: () => ipcRenderer.invoke('appearance:get'), set: patch => ipcRenderer.invoke('appearance:set', patch), onChange: cb => { const fn = (_e: unknown, s: import('../shared/appearance').Appearance) => cb(s); ipcRenderer.on('appearance:changed', fn); return () => { ipcRenderer.removeListener('appearance:changed', fn) } } },
   organizer: {

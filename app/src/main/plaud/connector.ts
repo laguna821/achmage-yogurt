@@ -76,7 +76,7 @@ export class PlaudConnector {
       const next={...c,accessToken:t.access_token,refreshToken:t.refresh_token||c.refreshToken,expiresAt:Date.now()+Number(t.expires_in||3600)*1000};this.save(next);return next
     })().finally(()=>{this.refresh=undefined})
   }
-  async call(name: 'list_files'|'get_file', args: Record<string,unknown>): Promise<any> {
+  async call(name: 'list_files'|'get_file'|'get_transcript'|'get_note', args: Record<string,unknown>): Promise<any> {
     const credentials=await this.token(),client=new Client({name:'Achmage Yogurt',version:'0.6.2'})
     const transport=new StreamableHTTPClientTransport(new URL(BASE+'/mcp'),{requestInit:{headers:{Authorization:'Bearer '+credentials.accessToken}},fetch:(url,init)=>this.fetcher(url,{...init,redirect:'error',signal:AbortSignal.any([...(init?.signal?[init.signal]:[]),AbortSignal.timeout(45_000)])})})
     try {await client.connect(transport);return mcpData(await client.callTool({name,arguments:args},undefined,{timeout:45_000}))}

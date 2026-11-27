@@ -1,3 +1,5 @@
+import { SubscriptionRateLimit, transientSubscriptionLimit, retrySubscription } from './subscriptionRetry'
+import { remoteJob } from './notes/remoteQueue'
 import { spawn, execFile } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join, delimiter } from 'node:path'
@@ -106,7 +108,7 @@ export function runSubscription(model: SubscriptionModel, messages: EngineMessag
       let answer: string
       try { answer = subscriptionAnswer(streamed, final) } catch (e) { return finish(e as Error) }
       if (limited && answer.trim()) return finish(new OutputLimitError(answer))
-      if (error || code !== 0) return finish(new Error(subscriptionError(model, error || stderr || `exit ${code}`)))
+      if (error || code !== 0) { const detail = error || stderr || `exit ${code}`; return finish(transientSubscriptionLimit(detail) ? new SubscriptionRateLimit(subscriptionError(model, detail)) : new Error(subscriptionError(model, detail))) }
       if (!answer.trim()) return finish(new Error('구독 모델이 빈 응답을 반환했습니다. 요약을 저장하지 않았습니다.'))
       if (!streamed && final) onToken(final)
       final = answer
@@ -135,7 +137,7 @@ export async function subscriptionLogin(name: 'claude' | 'codex', cwd: string) {
 export class SubscriptionEngine implements Engine {
   private controllers = new Set<AbortController>()
   private exits = new Set<() => void>()
-  constructor(private model: () => SubscriptionModel, private cwd: string, private effort: () => ReasoningEffort = () => 'xhigh') {}
+  constructor(private model: () => SubscriptionModel, private cwd: string, private effort: () => ReasoningEffort = () => 'xhigh', private waiting: (id: string, ms?: number) => void = () => {}) {}
   get busy() { return this.controllers.size > 0 }
   async load() { return { contextSize: this.model().startsWith('gpt-') ? 900_000 : 131_072 } }
   async unload() {}
@@ -152,7 +154,7 @@ export class SubscriptionEngine implements Engine {
     if (signal?.aborted) c.abort()
     const model = this.model()
     console.info('NOTES', `subscription ${model}, input ${req.messages.reduce((n, m) => n + m.content.length, 0)} characters`)
-    try { return await runSubscription(model, req.messages, this.cwd, onToken, c.signal, undefined, req.maxTokens, this.effort(), req.images) }
+    try { const id = remoteJob.getStore()?.meetingId; return await retrySubscription(mark => runSubscription(model, req.messages, this.cwd, text => { mark(); onToken(text) }, c.signal, undefined, req.maxTokens, this.effort(), req.images), c.signal, ms => { if (id) this.waiting(id, ms) }) }
     finally { this.controllers.delete(c); signal?.removeEventListener('abort', stop) }
   }
 }

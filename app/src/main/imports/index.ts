@@ -26,6 +26,7 @@ export function describeFile(path:string):ImportFile {
 }
 type Deps={completed?:(id:string,options?:VideoOptions)=>void;root:string;store:Store;window:()=>BrowserWindow|undefined;changed:()=>void;available:()=>boolean;recording:()=>boolean;transcribe:(id:string,tracks:{them:AsyncIterable<Float32Array>},stop:()=>boolean)=>Promise<boolean>}
 export class ImportManager {
+  private tasks=new Map<string,{abort:AbortController;promise:Promise<unknown>}>();
   private jobs=new Map<string,ImportJob>();private current?:{id:string;abort:AbortController};private scheduled=false
   constructor(private d:Deps){
     mkdirSync(this.jobDir(),{recursive:true})
@@ -33,6 +34,9 @@ export class ImportManager {
       if(!/^[a-f0-9-]{36}$/.test(j.id))continue
       if(j.stage==='failed' && j.url && /429|too many requests/i.test(j.message))j.errorDetail=j.message
       if(!['done','failed','cancelled','waiting','interrupted'].includes(j.stage)){j.stage='interrupted';j.message='앱이 종료되어 중단됐습니다. 원본을 보존했습니다. 다시 시작할 수 있습니다.'}
+      if(j.audioStatus==='pending'){j.audioStatus='failed';j.audioMessage='원음 보관이 중단됐습니다. Plaud에서 같은 녹음을 선택해 다시 보관할 수 있습니다.'}
+      const meeting=j.meetingId?this.d.store.meeting(j.meetingId):undefined
+      if(j.meetingId&&(!meeting||meeting.trashedAt!=null)){if(!isImportFinished(j.stage))j.stage='cancelled';j.dismissedAt??=Date.now()}
       this.jobs.set(j.id,j)
     }catch{/* A damaged job never affects the meeting database. */}}
   }
@@ -40,7 +44,7 @@ export class ImportManager {
   private jobDir(){return join(this.d.root,'imports')}
   list(){return [...this.jobs.values()].sort((a,b)=>b.createdAt-a.createdAt).map(j=>structuredClone(j))}
   private save(j:ImportJob,stage:ImportStage,message:string){j.stage=stage;j.message=message;j.updatedAt=Date.now();this.jobs.set(j.id,j);const p=join(this.jobDir(),j.id+'.json');writeFileSync(p+'.tmp',JSON.stringify(j,null,2),{mode:0o600});renameSync(p+'.tmp',p);this.d.window()?.webContents.send('imports:changed',this.list());this.d.changed()}
-  add(raw:ImportRequest){
+  add(raw:ImportRequest, immediate=false){
     if(!raw||typeof raw!=='object')throw new Error('가져올 자료를 확인하세요.')
     const files=Array.isArray(raw.paths)?raw.paths.map(describeFile):[]
     const url=raw.url?youtubeUrl(raw.url):undefined
@@ -49,29 +53,62 @@ export class ImportManager {
     if(!Number.isFinite(start)||start<0||end!==undefined&&(!Number.isFinite(end)||end<=start))throw new Error('영상 구간의 시작/종료 초를 확인하세요.')
     const externalSource=raw.externalSource?.provider==='plaud'&&typeof raw.externalSource.id==='string'&&/^[a-zA-Z0-9_-]{1,160}$/.test(raw.externalSource.id)?{provider:'plaud' as const,id:raw.externalSource.id}:undefined
     const j:ImportJob={externalSource,video:url&&raw.video?videoOptions(raw.video):undefined,id:randomUUID(),title:typeof raw.title==='string'&&raw.title.trim()?raw.title.trim().slice(0,200):files[0]?.name.replace(/\.[^.]+$/,'')||'YouTube 영상',files,url,caption:!!raw.caption,start,end,stage:'queued',message:'가져오기를 기다리고 있습니다.',createdAt:Date.now(),updatedAt:Date.now()}
-    this.save(j,'queued',j.message);this.kick();return structuredClone(j)
+    this.save(j,'queued',j.message);if(!immediate)this.kick();return structuredClone(j)
   }
-  cancel(id:string){const j=this.jobs.get(id);if(!j||j.stage==='done')return;if(this.current?.id===id)this.current.abort.abort();this.save(j,'cancelled','작업을 중단했습니다. 원본과 완료된 단계는 남아 있습니다.')}
+  cancel(id:string){const j=this.jobs.get(id);if(!j)return;this.tasks.get(id)?.abort.abort();if(this.current?.id===id)this.current.abort.abort();if(j.stage!=='done')this.save(j,'cancelled','작업을 중단했습니다. 원본과 완료된 단계는 남아 있습니다.')}
+  cancelMeeting(id:string){for(const j of this.jobs.values())if(j.meetingId===id){this.cancel(j.id);j.dismissedAt=Date.now();this.save(j,j.stage,j.message)}}
+  async settleMeeting(id:string){await Promise.allSettled([...this.jobs.values()].filter(j=>j.meetingId===id).map(j=>this.tasks.get(j.id)?.promise))}
+  usable(job:ImportJob){const m=job.meetingId?this.d.store.meeting(job.meetingId):undefined;return !job.meetingId||!!m&&m.trashedAt==null}
+  audioState(id:string,status:ImportJob['audioStatus'],message:string){const j=this.jobs.get(id);if(j){j.audioStatus=status;j.audioMessage=message;this.save(j,j.stage,j.message)}}
+  /** Existing text bypasses the ASR queue and never starts a model or touches another record. */
+  async provideTranscript(raw:ImportRequest,recordedAt?:number){
+    const created=this.add(raw,true),j=this.jobs.get(created.id)!,abort=new AbortController()
+    j.recordedAt=Number.isFinite(recordedAt)?recordedAt:undefined;j.transcriptSource='plaud-transcript'
+    const promise=this.run(j,abort.signal).catch(e=>{this.save(j,abort.signal.aborted?'cancelled':'failed',errorText(e));throw e}).finally(()=>this.tasks.delete(j.id))
+    this.tasks.set(j.id,{abort,promise});await promise;return structuredClone(j)
+  }
+  async attachAudio(jobId:string,path:string,signal:AbortSignal){
+    const j=this.jobs.get(jobId);if(!j?.meetingId||!this.usable(j))throw new Error('원음을 보관할 기록이 삭제됐습니다.')
+    const abort=new AbortController(),combined=AbortSignal.any([signal,abort.signal]),id=j.meetingId
+    const promise=(async()=>{
+      const dir=join(this.d.root,'meetings',id),original=join(dir,'original'),file=describeFile(path)
+      if(file.kind!=='media')throw new Error('음성 파일을 확인하세요.')
+      if(combined.aborted)throw new Error('원음 보관을 중단했습니다.')
+      mkdirSync(original,{recursive:true});const dest=join(original,'plaud-'+file.name)
+      await copyFile(path,dest)
+      const sha256=await hashFile(dest)
+      if(combined.aborted)throw new Error('원음 보관을 중단했습니다.')
+      const temp=join(dir,'them.import.ogg'),playback=join(dir,'them.ogg')
+      // A recording resumed while the original was downloading owns its playback file.
+      if(!existsSync(playback))await command(mediaTool('ffmpeg'),['-nostdin','-y','-v','error','-protocol_whitelist','file,pipe','-i',dest,'-map','0:a:0','-vn','-ac','1','-c:a','libopus','-b:a','64k',temp],combined)
+      if(combined.aborted||!this.usable(j))throw new Error('원음 보관을 중단했습니다.')
+      if(existsSync(temp)&&!existsSync(playback))renameSync(temp,playback);j.assets??=[]
+      if(!j.assets.some(a=>a.sha256===sha256))j.assets.push({name:basename(dest),bytes:file.bytes,sha256})
+      this.audioState(j.id,'saved','원음을 보관했습니다. 전사를 다시 실행하지 않았습니다.')
+    })().finally(()=>this.tasks.delete(jobId))
+    this.tasks.set(jobId,{abort,promise});await promise
+  }
   dismiss(id:string){
     const j=this.jobs.get(id)
     if(!j||j.dismissedAt)return
-    if(!isImportFinished(j.stage)||this.current?.id===id)throw new Error('진행 중인 작업은 끝난 뒤 내역을 지울 수 있습니다.')
+    if(!isImportFinished(j.stage))throw new Error('진행 중인 작업은 끝난 뒤 내역을 지울 수 있습니다.')
     j.dismissedAt=Date.now()
     this.save(j,j.stage,j.message)
   }
-  dismissFinished(){for(const j of this.jobs.values())if(isImportFinished(j.stage)&&this.current?.id!==j.id)this.dismiss(j.id)}
-  retry(id:string){const j=this.jobs.get(id);if(!j||this.current?.id===id||j.stage==='done')return;delete j.dismissedAt;this.save(j,'queued','완료된 파일을 재사용해 다시 시작합니다.');this.kick()}
+  dismissFinished(){for(const j of this.jobs.values())if(isImportFinished(j.stage))this.dismiss(j.id)}
+  retry(id:string){const j=this.jobs.get(id);if(!j||this.current?.id===id||this.tasks.has(id)||j.stage==='done'||!this.usable(j))return;delete j.dismissedAt;this.save(j,'queued','완료된 파일을 재사용해 다시 시작합니다.');this.kick()}
   kick(){if(this.scheduled)return;this.scheduled=true;queueMicrotask(()=>{this.scheduled=false;void this.runNext()})}
   private async runNext(){
     if(this.current||this.d.recording())return
     const j=[...this.jobs.values()].find(j=>j.stage==='queued'||j.stage==='waiting'&&this.d.available());if(!j)return
     const abort=new AbortController();this.current={id:j.id,abort}
-    try{await this.run(j,abort.signal)}catch(e){j.errorDetail=errorText(e).slice(0,2000);this.save(j,abort.signal.aborted?'cancelled':'failed',j.url&&!abort.signal.aborted?youtubeImportError(j.errorDetail):j.errorDetail.slice(0,1000))}finally{this.current=undefined;this.kick()}
+    const promise=this.run(j,abort.signal);this.tasks.set(j.id,{abort,promise});
+    try{await promise}catch(e){j.errorDetail=errorText(e).slice(0,2000);this.save(j,abort.signal.aborted?'cancelled':'failed',j.url&&!abort.signal.aborted?youtubeImportError(j.errorDetail):j.errorDetail.slice(0,1000))}finally{this.tasks.delete(j.id);this.current=undefined;this.kick()}
   }
   private async run(j:ImportJob,signal:AbortSignal){
     const meeting=j.meetingId?this.d.store.meeting(j.meetingId):undefined
-    if(j.meetingId&&!meeting)throw new Error('가져온 기록이 삭제됐습니다. 새 작업으로 가져오세요.')
-    if(!j.meetingId){const now=Date.now(),m=this.d.store.createMeeting({title:j.title,titleSource:'user',startedAt:now,endedAt:now,state:'stopped',eventId:null,app:null,attendees:[],language:'korean'});j.meetingId=m.id}
+    if(j.meetingId&&(!meeting||meeting.trashedAt!=null))throw new Error('가져온 기록이 삭제됐습니다. 새 작업으로 가져오세요.')
+    if(!j.meetingId){const now=j.recordedAt??Date.now(),m=this.d.store.createMeeting({title:j.title,titleSource:'user',startedAt:now,endedAt:now,state:'stopped',eventId:null,app:null,attendees:[],language:'korean'});j.meetingId=m.id}
     const id=j.meetingId,dir=join(this.d.root,'meetings',id),original=join(dir,'original');mkdirSync(original,{recursive:true})
     // Persist identity before the first network/model step, including failed or interrupted imports.
     const saveSource=()=>{const path=join(dir,'import-source.json');writeFileSync(path+'.tmp',JSON.stringify({jobId:j.id,externalSource:j.externalSource,url:j.url,video:j.video,caption:!!j.caption,transcriptSource:j.transcriptSource,captionLanguage:j.captionLanguage,captionAutomatic:j.captionAutomatic,captionFallback:j.captionFallback,start:j.start,end:j.end,assets:j.assets,importedAt:j.createdAt},null,2),{mode:0o600});renameSync(path+'.tmp',path)}
@@ -109,9 +146,11 @@ export class ImportManager {
       duration=Number((await command(mediaTool('ffprobe'),['-v','error','-show_entries','format=duration','-of','default=nw=1:nk=1',playback],signal)).trim())*1000
       if(!Number.isFinite(duration)||duration<=0)throw new Error('오디오 길이를 확인하지 못했습니다.')
     }
+    if(signal.aborted||!this.usable(j))throw new Error('작업을 중단했습니다.')
     if(transcript){
       this.save(j,'copying','기존 전사 원문과 시간·화자 표기를 가져오고 있습니다. 재전사는 생략합니다.')
       const ext=extname(transcript).slice(1).toLowerCase(),raw=['docx','pdf'].includes(ext)?(await importMaterial(transcript,'import',signal)).text:readFileSync(transcript,'utf8')
+      if(signal.aborted||!this.usable(j))throw new Error('작업을 중단했습니다.')
       if(raw.length>2_000_000)throw new Error('전사 원문은 200만 자까지 가져올 수 있습니다.')
       const parsed=parseTranscript(raw,ext),turns=j.url&&j.caption&&parsed.timed?parsed.turns.filter(t=>t.endMs>(j.start||0)*1000&&(!j.end||t.startMs<j.end*1000)).map(t=>({...t,startMs:Math.max(0,t.startMs-(j.start||0)*1000),endMs:Math.min(t.endMs,j.end?j.end*1000:Infinity)-(j.start||0)*1000})):parsed.turns
       if(!turns.length)throw new Error('선택한 범위에 전사 내용이 없습니다.')
@@ -119,7 +158,7 @@ export class ImportManager {
         const existing=this.d.store.segments(id)
         if(existing.length&&JSON.stringify(existing.map(s=>({text:s.text,startMs:s.startMs,endMs:s.endMs,speaker:s.speaker})))!==JSON.stringify(turns.map(s=>({text:s.text,startMs:s.startMs,endMs:s.endMs,speaker:s.speaker}))))throw new Error('기록에 이미 다른 전사가 있습니다. 기존 전사를 보존했습니다.')
         if(!existing.length)this.d.store.addSegments(turns.map(t=>({...t,meetingId:id,track:'them' as const})))
-        writeFileSync(join(dir,'import-transcript.json'),JSON.stringify({timed:parsed.timed,source:basename(transcript),kind:j.caption?'youtube-captions':'provided-transcript',turns},null,2),{mode:0o600})
+        writeFileSync(join(dir,'import-transcript.json'),JSON.stringify({timed:parsed.timed,source:basename(transcript),kind:j.transcriptSource==='plaud-transcript'?'plaud-transcript':j.caption?'youtube-captions':'provided-transcript',turns},null,2),{mode:0o600})
       }
       duration=duration||Math.max(0,...turns.map(t=>t.endMs))
       this.d.store.updateMeeting(id,{transcriptionPending:false})

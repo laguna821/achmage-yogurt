@@ -43,7 +43,7 @@ export function createVideoHost(p: { sources?: ConstructorParameters<typeof Vide
     if (!state.transcriptReady) throw new Error('전사 가져오기가 아직 완료되지 않았습니다. 가져오기 상태를 확인하세요.')
     if (state.options.depth === 'transcript') return state
     const expected = p.store.notes(id).enhanced
-    workspace.stage(id, 'queued', '녹음·전사와 모델 대기열을 확인하고 있습니다.')
+    workspace.stage(id, 'queued', '이 기록의 정리를 준비하고 있습니다.')
     launch(id, async (llm, signal) => { const md = await workspace.run(id, llm, signal); if (!signal.aborted) commit(id, md, expected) })
     return workspace.get(id)!
   }

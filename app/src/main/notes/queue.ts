@@ -5,6 +5,7 @@
  * meeting records, and gives way to anything else (run again after: what it did stays done).
  * folder: one folder proposal per meeting, with the same priority and recording policy as indexing.
  */
+import { createRemoteQueue } from './remoteQueue'
 export type JobKind = 'names' | 'enhance' | 'chat' | 'readahead' | 'index' | 'folder'
 /** A job gets a signal: aborted when a recording starts on a small Mac. It is then run again from the start later. */
 export type Job = (signal: AbortSignal) => Promise<void>
@@ -35,6 +36,7 @@ const CHECK_MS = 1000
  *   running job is stopped and run again once it has caught up (under 10 s).
  */
 export function createQueue(o: {
+  remote?: boolean
   recording: () => boolean
   smallMac: boolean
   /** the most audio waiting for transcription on any track, in ms (bigger Macs) */
@@ -45,6 +47,7 @@ export function createQueue(o: {
   /** a notes model is on the Mac (first run: not until its download lands); nothing runs before */
   modelReady?: () => boolean
 }) {
+  if (o.remote) return createRemoteQueue(o)
   const waiting: Entry[] = []
   let running: { entry: Entry; abort: AbortController } | undefined
   let idleTimer: NodeJS.Timeout | undefined
@@ -164,9 +167,10 @@ export function createQueue(o: {
     cancel(meetingId: string) {
       gone.add(meetingId)
       for (const e of waiting.filter((x) => x.meetingId === meetingId)) { waiting.splice(waiting.indexOf(e), 1); e.resolve() }
-      if (running?.entry.meetingId === meetingId) running.abort.abort()
+      if (running?.entry.meetingId === meetingId) { running.entry.cancelled = true; running.abort.abort() }
       pump()
     },
+    restore(meetingId: string) { gone.delete(meetingId); pump() },
     /** the first notes model has landed: what waited for it runs now */
     modelArrived() { pump() },
     busy: () => !!running || waiting.length > 0,

@@ -1,3 +1,5 @@
+import { useRecordActivity } from '../useRecordActivity'
+import type { RecordActivity } from '../../../shared/activity'
 import { ImportWorkspace } from '../components/ImportWorkspace'
 import { LoadingContent } from '../components/LoadingContent'
 import { StartRecording } from '../components/StartRecording'
@@ -119,6 +121,7 @@ export function usePastNotes(folder?: string, category?: 'video' | 'recording') 
 
 /** Delete on a row moves the meeting to the Trash at once (Undo in the note at the bottom) */
 export function PastNotes({ cards, day, more, sentinel, onOpen, openFolder, showFolders = true, loading = false }: { loading?: boolean; cards: MeetingCard[]; day: string; more: boolean; sentinel: (el: HTMLDivElement | null) => void; onOpen: (id: string) => void; openFolder?: (id: string) => void; showFolders?: boolean }) {
+  const activity = useRecordActivity()
   const lang = useLanguage()
   const me = useMyName()
   const [selection, select] = useReducer(meetingSelection, emptySelection)
@@ -167,14 +170,14 @@ export function PastNotes({ cards, day, more, sentinel, onOpen, openFolder, show
   }}>
     {days.map((group) => <div className="native-meeting-day" key={group.key}>
       <h2 data-row-heading={loading ? undefined : group.key} data-testid={loading ? undefined : "past-day"}>{loading ? <span className="loading-bar" style={{ width: 48 }} /> : group.label}</h2>
-      <ul>{group.cards.map((meeting) => loading ? <li className="native-meeting-row" key={meeting.id}><PastCard c={meeting} onOpen={onOpen} me="" showFolders={showFolders} loading /></li> : <MeetingRow key={meeting.id} id={meeting.id} recording={meeting.state === 'recording'} selected={selected.includes(meeting.id)} targets={meetingTargets(selected, meeting.id)} memberships={memberships} busy={busy}
+      <ul>{group.cards.map((meeting) => loading ? <li className="native-meeting-row" key={meeting.id}><PastCard c={meeting} onOpen={onOpen} me="" showFolders={showFolders} loading /></li> : <MeetingRow key={meeting.id} activity={activity.get(meeting.id)} id={meeting.id} recording={meeting.state === 'recording'} selected={selected.includes(meeting.id)} targets={meetingTargets(selected, meeting.id)} memberships={memberships} busy={busy}
         onSelect={() => select({ type: 'select', id: meeting.id, visible })} onTrash={ids => void trash(ids)}
         onClick={e => {
           if (selectsMeeting(selected.length, command(e), e.shiftKey)) {
             e.preventDefault(); e.stopPropagation(); select({ type: e.shiftKey ? 'range' : 'toggle', id: meeting.id, visible })
           }
         }}>
-        {(openFolders, more) => <PastCard more={more} c={meeting} onOpen={onOpen} openFolder={openFolder} openFolders={openFolders} me={me} selected={selected.includes(meeting.id)} dragIds={meetingTargets(selected, meeting.id)} showFolders={showFolders} />}
+        {(openFolders, more) => <PastCard activity={activity.get(meeting.id)} more={more} c={meeting} onOpen={onOpen} openFolder={openFolder} openFolders={openFolders} me={me} selected={selected.includes(meeting.id)} dragIds={meetingTargets(selected, meeting.id)} showFolders={showFolders} />}
       </MeetingRow>)}</ul>
     </div>)}
     {more && <div data-testid="past-more" ref={sentinel} className="h-8" aria-hidden="true" />}
@@ -183,7 +186,7 @@ export function PastNotes({ cards, day, more, sentinel, onOpen, openFolder, show
 }
 
 /** when: in place of the time (the Trash shows the day); fixed: not dragged onto folders */
-export function PastCard({ c, onOpen, openFolder, openFolders, more, when, fixed, me, selected, dragIds, showFolders = true, loading = false }: { more?: ReactNode; selected?: boolean; dragIds?: string[]; loading?: boolean; c: MeetingCard; onOpen: (id: string) => void; openFolder?: (id: string) => void; openFolders?: (suggestedId: string) => void; when?: string; fixed?: boolean; me: string; showFolders?: boolean }) {
+export function PastCard({ activity, c, onOpen, openFolder, openFolders, more, when, fixed, me, selected, dragIds, showFolders = true, loading = false }: { activity?: RecordActivity; more?: ReactNode; selected?: boolean; dragIds?: string[]; loading?: boolean; c: MeetingCard; onOpen: (id: string) => void; openFolder?: (id: string) => void; openFolders?: (suggestedId: string) => void; when?: string; fixed?: boolean; me: string; showFolders?: boolean }) {
   const recording = c.state === 'recording'
   const minutes = (c.state === 'done' || c.state === 'stopped') && c.endedAt != null
     ? Math.max(1, Math.round((c.durationMs ?? (c.endedAt - c.startedAt)) / 60_000)) : null
@@ -211,6 +214,7 @@ export function PastCard({ c, onOpen, openFolder, openFolders, more, when, fixed
     <span className="meeting-content">
     <span className={`meeting-identity ${recording ? 'recording' : ''}`} aria-hidden="true">{loading ? null : c.category === 'video' ? <FileVideoCamera size={16} /> : recording ? <Mic size={16} /> : c.attendees.length > 1 ? <Users size={16} /> : initials || <FileText size={16} />}</span>
     <span className="meeting-description"><strong>{loading ? <span className="loading-bar" style={{ width: c.title.length * 6, maxWidth: '85%' }} /> : c.title}</strong><span data-testid={loading ? undefined : "past-note-attendees"} title={c.attendees.map((p) => p.name).join(', ') || undefined}>{loading ? <span className="loading-bar" style={{ width: 110 }} /> : c.category === 'video' ? 'YouTube 영상' : c.attendees.length ? peopleSummary(c.attendees, me) : t('Personal notes')}</span>
+    {activity && <span className="meeting-activity-label" data-state={activity.state} title={activity.label} role="status">{activity.label}</span>}
     </span>
     </span>
     <span className="meeting-meta row-swap-meta">{recording ? <span className="meeting-live"><Circle size={6} fill="currentColor" />{c.paused ? t('Paused') : t('Recording')}</span> : <><time>{loading ? <span className="loading-bar" style={{ width: 45 }} /> : when ?? timeOf(c.startedAt)}</time>{minutes != null && <small data-testid="past-note-duration">{loading ? <span className="loading-bar" style={{ width: 26 }} /> : t('{count} min', { count: minutes })}</small>}</>}</span>
